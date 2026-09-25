@@ -1,0 +1,158 @@
+import ExcelJS from 'exceljs';
+import pdfMake from "pdfmake/build/pdfmake";
+import pdfFonts from "pdfmake/build/vfs_fonts";
+
+pdfMake.vfs = pdfFonts;
+
+export const exportToExcel = async (data, columns, filename, sheetName = 'Reporte') => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet(sheetName);
+
+    sheet.columns = columns;
+
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF153250' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    headerRow.height = 20;
+
+    data.forEach((item, index) => {
+      const rowData = {};
+      columns.forEach(col => {
+        rowData[col.key] = typeof col.getValue === 'function' ? col.getValue(item) : item[col.key];
+      });
+      const row = sheet.addRow(rowData);
+      
+      const isPair = index % 2 === 0;
+      row.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        if (isPair) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F6FA' } };
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte Excel generado y descargado'}));
+  } catch (error) {
+    console.error(error);
+    window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al generar Excel'}));
+  }
+};
+
+export const exportToPDF = (data, columns, title, filename, returnBase64 = false) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const tableHeader = columns.map(c => ({ text: c.header, style: 'tableHeader' }));
+      
+      const tableBody = data.map((item, index) => {
+        const rowBg = index % 2 === 0 ? '#F5F6FA' : '#FFFFFF';
+        return columns.map(c => ({
+          text: typeof c.getValue === 'function' ? c.getValue(item) : (item[c.key] || ''),
+          fillColor: rowBg,
+          fontSize: 9
+        }));
+      });
+
+      const docDefinition = {
+        pageSize: 'A4',
+        pageOrientation: columns.length > 5 ? 'landscape' : 'portrait',
+        pageMargins: [40, 60, 40, 60],
+        header: function() {
+          return {
+            columns: [
+              {
+                stack: [
+                  { text: 'SISTEMA DE GESTIÓN DE INCIDENCIAS APPB', color: '#2B6B9A', fontSize: 9, bold: true, characterSpacing: 1 },
+                  { text: title, color: '#153250', fontSize: 24, bold: true, margin: [0, 4, 0, 0] }
+                ],
+                margin: [40, 20, 0, 0]
+              }
+            ]
+          };
+        },
+        footer: function(currentPage, pageCount) {
+          return {
+            columns: [
+              { text: `Generado el: ${new Date().toLocaleString()}`, color: 'gray', fontSize: 8, alignment: 'left', margin: [40, 0] },
+              { text: `Página ${currentPage} de ${pageCount}`, color: 'gray', fontSize: 8, alignment: 'right', margin: [0, 0, 40, 0] }
+            ]
+          };
+        },
+        content: [
+          {
+            table: {
+              headerRows: 1,
+              widths: columns.map(c => c.width === 'auto' ? 'auto' : '*'),
+              body: [
+                tableHeader,
+                ...tableBody
+              ]
+            },
+            layout: {
+              hLineWidth: function (i, node) { return (i === 0 || i === 1 || i === node.table.body.length) ? 1 : 0; },
+              vLineWidth: function (i, node) { return 0; },
+              hLineColor: function (i, node) { return i === 1 ? '#B4C8DC' : '#E0E0E0'; },
+              paddingLeft: function(i, node) { return 4; },
+              paddingRight: function(i, node) { return 4; },
+              paddingTop: function(i, node) { return 6; },
+              paddingBottom: function(i, node) { return 6; }
+            }
+          }
+        ],
+        styles: {
+          tableHeader: {
+            bold: true,
+            fontSize: 10,
+            color: '#FFFFFF',
+            fillColor: '#153250',
+            margin: [0, 4, 0, 4]
+          }
+        }
+      };
+
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+      
+      if (returnBase64) {
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Generando PDF en memoria...'}));
+        
+        pdfDocGenerator.getBlob()
+          .then((blob) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              window.dispatchEvent(new CustomEvent('app-success', {detail: 'PDF generado, enviando a servidor...'}));
+              resolve(reader.result);
+            };
+            reader.onerror = () => reject(new Error("Error leyendo el blob"));
+            reader.readAsDataURL(blob);
+          })
+          .catch((err) => {
+            console.error("Error generating blob:", err);
+            reject(err);
+          });
+      } else {
+        pdfDocGenerator.download(filename);
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado y descargado'}));
+        resolve();
+      }
+    } catch (error) {
+      console.error(error);
+      if (!returnBase64) {
+        window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al generar PDF'}));
+      } else {
+        window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error interno al armar PDF'}));
+      }
+      reject(error);
+    }
+  });
+};

@@ -1,0 +1,13 @@
+﻿{
+    "appId":  "com.appb.tecnicos",
+    "webDir":  "dist",
+    "appName":  "APPB",
+    "server":  {
+                   "cleartext":  true
+               },
+    "plugins":  {
+                    "CapacitorHttp":  {
+                                          "enabled":  true
+                                      }
+                }
+}

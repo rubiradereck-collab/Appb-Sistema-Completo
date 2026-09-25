@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<configSections>
+	</configSections>
+	<connectionStrings>
+		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2"
+			connectionString="Data Source=131.150.25.22,1433;Initial Catalog=DBIncidencias;User ID=appb_app;Password=TU_NUEVO_PASSWORD_SQL;Encrypt=True;TrustServerCertificate=True"
+			providerName="System.Data.SqlClient" />
+	</connectionStrings>
+</configuration>

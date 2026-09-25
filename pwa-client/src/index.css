@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #162d47;
+  --color-brand-blue: #2988c9;
+  --color-brand-light: #f8fafc;
+  --color-brand-hover: #1e3f66;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-light text-gray-900 antialiased;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+  .input-modern {
+    @apply w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all;
+  }
+  .btn-primary {
+    @apply flex items-center justify-center space-x-2 bg-brand-blue text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:bg-brand-hover hover:shadow-lg transition-all active:scale-95;
+  }
+  .btn-secondary {
+    @apply flex items-center justify-center space-x-2 bg-white text-gray-700 border border-gray-200 font-bold py-2.5 px-4 rounded-xl hover:bg-gray-50 transition-all active:scale-95;
+  }
+  .btn-danger {
+    @apply flex items-center justify-center space-x-2 bg-red-50 text-red-600 font-bold py-2.5 px-4 rounded-xl hover:bg-red-100 transition-all active:scale-95;
+  }
+  .card-modern {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+  }
+  .table-header {
+    @apply bg-brand-dark text-white text-xs uppercase tracking-wider font-semibold py-4 px-6 text-left sticky top-0 z-10;
+  }
+  .table-cell {
+    @apply py-4 px-6 border-b border-gray-100 text-sm align-middle;
+  }
+}

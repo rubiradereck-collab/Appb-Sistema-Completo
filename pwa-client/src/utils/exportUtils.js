@@ -2,6 +2,41 @@ import ExcelJS from 'exceljs';
 import pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
 
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
+const saveAndShareFile = async (dataBase64, filename) => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await Filesystem.writeFile({
+        path: filename,
+        data: dataBase64,
+        directory: Directory.Cache
+      });
+      await Share.share({
+        title: filename,
+        url: result.uri,
+      });
+      return true;
+    } catch (e) {
+      console.error(e);
+      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error guardando archivo nativo'}));
+      return true;
+    }
+  }
+  return false;
+};
+
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
 pdfMake.vfs = pdfFonts;
 
 const calcularMetricas = (incidencias) => {
@@ -221,7 +256,14 @@ export const exportToPDF = (data, tituloReporte, filename, returnBase64 = false)
             reject(err);
           });
       } else {
-        pdfDocGenerator.download(filename);
+        if (Capacitor.isNativePlatform()) {
+  pdfDocGenerator.getBase64(async (base64) => {
+    await saveAndShareFile(base64, filename);
+  });
+} else {
+  pdfDocGenerator.download(filename);
+}
+
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado y descargado'}));
         resolve();
       }
@@ -274,7 +316,12 @@ export const exportToExcel = async (incidencias, filename) => {
     sheet.views = [ { state: 'frozen', xSplit: 0, ySplit: 1 } ];
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (Capacitor.isNativePlatform()) {
+  const base64 = arrayBufferToBase64(buffer);
+  await saveAndShareFile(base64, filename);
+  return;
+}
+const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -389,7 +436,14 @@ export const exportGuiasPDF = (guias, tituloReporte, filename, returnBase64 = fa
           })
           .catch((err) => reject(err));
       } else {
-        pdfDocGenerator.download(filename);
+        if (Capacitor.isNativePlatform()) {
+  pdfDocGenerator.getBase64(async (base64) => {
+    await saveAndShareFile(base64, filename);
+  });
+} else {
+  pdfDocGenerator.download(filename);
+}
+
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Catálogo de Guías descargado'}));
         resolve();
       }
@@ -433,7 +487,12 @@ export const exportGuiasExcel = async (guias, filename) => {
     sheet.views = [ { state: 'frozen', xSplit: 0, ySplit: 1 } ];
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (Capacitor.isNativePlatform()) {
+  const base64 = arrayBufferToBase64(buffer);
+  await saveAndShareFile(base64, filename);
+  return;
+}
+const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -506,7 +565,14 @@ export const exportGenericPDF = (data, columns, title, filename) => {
       };
 
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-      pdfDocGenerator.download(filename);
+      if (Capacitor.isNativePlatform()) {
+  pdfDocGenerator.getBase64(async (base64) => {
+    await saveAndShareFile(base64, filename);
+  });
+} else {
+  pdfDocGenerator.download(filename);
+}
+
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado'}));
       resolve();
     } catch (error) {
@@ -537,7 +603,12 @@ export const exportGenericExcel = async (data, columns, filename) => {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (Capacitor.isNativePlatform()) {
+  const base64 = arrayBufferToBase64(buffer);
+  await saveAndShareFile(base64, filename);
+  return;
+}
+const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

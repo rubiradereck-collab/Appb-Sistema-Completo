@@ -6,6 +6,55 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const { getSqlServerDb, sql } = require("./db_sqlserver");
 
+const axios = require('axios');
+
+﻿const enviarTelegram = async (chatId, text) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return;
+  try {
+    await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+      chat_id: chatId,
+      text: text
+    });
+  } catch (err) {
+    console.error('Error al enviar Telegram:', err.message);
+  }
+};
+
+const notificarNuevaIncidencia = async (pool, incidencia) => {
+  try {
+    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
+    const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (App Móvil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    for (const t of tecnicos.recordset) {
+      await enviarTelegram(t.TelegramChatId, mensaje);
+    }
+  } catch (err) {
+    console.error('Error al notificar nueva incidencia', err);
+  }
+};
+
+const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecnicoId, nuevoValor) => {
+  try {
+    if (!tecnicoId) return;
+    const userRes = await pool.request().input('Id', require('mssql').Int, tecnicoId).query("SELECT TelegramChatId FROM Usuarios WHERE IdUsuario = @Id");
+    const chatId = userRes.recordset[0]?.TelegramChatId;
+    if (!chatId) return;
+
+    let mensaje = '';
+    if (accion === 'asignar') {
+      mensaje = `🔔 Se te ha asignado la Incidencia #${incidenciaId}`;
+    } else if (accion === 'estado') {
+      mensaje = `ℹ️ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+    }
+    
+    if (mensaje) await enviarTelegram(chatId, mensaje);
+  } catch (err) {
+    console.error('Error al notificar actualizacion', err);
+  }
+};
+
+  }
+};
 const app = express();
 app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url);next();});
 app.use(cors());
@@ -102,18 +151,22 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 const verifyToken = (req, res, next) => {
-  if (req.path.startsWith('/api/reportes/incidencias/')) return next();
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  let token = authHeader && authHeader.split(" ")[1];
+  
+  // Soporte para token por query string (ej: para descargas desde el navegador)
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
 
   if (!token) return res.status(401).json({ message: "Token requerido" });
 
   jwt.verify(token, process.env.JWT_SECRET || "super_secret_key_12345", (err, decoded) => {
-    if (err) return res.status(403).json({ message: "Token invÃ¡lido o expirado" });
+    if (err) return res.status(403).json({ message: "Token invlido o expirado" });
     req.user = decoded;
     next();
   });
-};
+};;
 app.use(verifyToken);
 
 const requireAdmin = (req, res, next) => {
@@ -528,6 +581,7 @@ app.post("/api/incidencias", async (req, res) => {
     
     const newIn = await pool.request().input("IdIncidencia", sql.Int, newId).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     res.status(201).json(newIn.recordset[0]);
+      notificarNuevaIncidencia(pool, newIn.recordset[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
 });
 
@@ -618,6 +672,9 @@ app.get('/api/reportes/incidencias/excel', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API (SQL Server backend) running on http://localhost:${PORT}`);
 });
+
+
+
 
 
 

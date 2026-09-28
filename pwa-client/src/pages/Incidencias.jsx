@@ -21,12 +21,12 @@ const Incidencias = ({ filterTecnico = false }) => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000); // Actualiza cada 15s para sincronizar con el Bot
+    const interval = setInterval(() => fetchData(true), 15000); // Actualiza cada 15s para sincronizar con el Bot
     return () => clearInterval(interval);
   }, [filterTecnico]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isAutoRefresh = false) => {
+    if (!isAutoRefresh) setLoading(true);
     try {
       const [incRes, estRes] = await Promise.all([
         api.get('/incidencias'), // El backend real trae todo, filtramos en el cliente
@@ -37,7 +37,7 @@ const Incidencias = ({ filterTecnico = false }) => {
     } catch (error) {
       console.error('Error fetching data', error);
     }
-    setLoading(false);
+    if (!isAutoRefresh) setLoading(false);
   };
 
   const getPriorityColor = (id) => {

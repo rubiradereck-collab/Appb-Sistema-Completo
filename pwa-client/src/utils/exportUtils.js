@@ -6,23 +6,20 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-const saveAndShareFile = async (dataBase64, filename) => {
+const saveNativeFile = async (dataBase64, filename) => {
   if (Capacitor.isNativePlatform()) {
     try {
       const result = await Filesystem.writeFile({
         path: filename,
         data: dataBase64,
-        directory: Directory.Cache
+        directory: Directory.Documents
       });
-      await Share.share({
-        title: filename,
-        url: result.uri,
-      });
+      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte guardado en Documentos: ' + filename}));
       return true;
     } catch (e) {
       console.error(e);
       window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error guardando archivo nativo'}));
-      return true;
+      return false;
     }
   }
   return false;
@@ -258,7 +255,7 @@ export const exportToPDF = (data, tituloReporte, filename, returnBase64 = false)
       } else {
         if (Capacitor.isNativePlatform()) {
   pdfDocGenerator.getBase64(async (base64) => {
-    await saveAndShareFile(base64, filename);
+    await saveNativeFile(base64, filename);
   });
 } else {
   pdfDocGenerator.download(filename);
@@ -318,7 +315,7 @@ export const exportToExcel = async (incidencias, filename) => {
     const buffer = await workbook.xlsx.writeBuffer();
     if (Capacitor.isNativePlatform()) {
   const base64 = arrayBufferToBase64(buffer);
-  await saveAndShareFile(base64, filename);
+  await saveNativeFile(base64, filename);
   return;
 }
 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -438,7 +435,7 @@ export const exportGuiasPDF = (guias, tituloReporte, filename, returnBase64 = fa
       } else {
         if (Capacitor.isNativePlatform()) {
   pdfDocGenerator.getBase64(async (base64) => {
-    await saveAndShareFile(base64, filename);
+    await saveNativeFile(base64, filename);
   });
 } else {
   pdfDocGenerator.download(filename);
@@ -489,7 +486,7 @@ export const exportGuiasExcel = async (guias, filename) => {
     const buffer = await workbook.xlsx.writeBuffer();
     if (Capacitor.isNativePlatform()) {
   const base64 = arrayBufferToBase64(buffer);
-  await saveAndShareFile(base64, filename);
+  await saveNativeFile(base64, filename);
   return;
 }
 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -567,7 +564,7 @@ export const exportGenericPDF = (data, columns, title, filename) => {
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
       if (Capacitor.isNativePlatform()) {
   pdfDocGenerator.getBase64(async (base64) => {
-    await saveAndShareFile(base64, filename);
+    await saveNativeFile(base64, filename);
   });
 } else {
   pdfDocGenerator.download(filename);
@@ -605,7 +602,7 @@ export const exportGenericExcel = async (data, columns, filename) => {
     const buffer = await workbook.xlsx.writeBuffer();
     if (Capacitor.isNativePlatform()) {
   const base64 = arrayBufferToBase64(buffer);
-  await saveAndShareFile(base64, filename);
+  await saveNativeFile(base64, filename);
   return;
 }
 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

@@ -23,8 +23,8 @@ const enviarTelegram = async (chatId, text) => {
 
 const notificarNuevaIncidencia = async (pool, incidencia) => {
   try {
-    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'TÃ©cnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
-    const mensaje = `ðŸ†• Nueva Incidencia #${incidencia.IdIncidencia} (App MÃ³vil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripciÃ³n: ${incidencia.Descripcion}`;
+    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
+    const mensaje = `í°Å¸â â¢ Nueva Incidencia #${incidencia.IdIncidencia} (App MíÂ³vil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripciíÂ³n: ${incidencia.Descripcion}`;
     for (const t of tecnicos.recordset) {
       await enviarTelegram(t.TelegramChatId, mensaje);
     }
@@ -42,9 +42,9 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
 
     let mensaje = '';
     if (accion === 'asignar') {
-      mensaje = `ðŸ”” Se te ha asignado la Incidencia #${incidenciaId}`;
+      mensaje = `í°Å¸ââ Se te ha asignado la Incidencia #${incidenciaId}`;
     } else if (accion === 'estado') {
-      mensaje = `â„¹ï¸ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+      mensaje = `í¢âÂ¹í¯Â¸Â Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
     }
     
     if (mensaje) await enviarTelegram(chatId, mensaje);
@@ -63,7 +63,7 @@ app.use(express.json({ limit: "10mb" }));
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
 
-// ConfiguraciÃƒÂ³n Nodemailer
+// ConfiguraciíÆíÂ³n Nodemailer
 const getTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -83,9 +83,9 @@ app.get("/api/test-db", async (req, res) => {
   try {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT 1 AS TestStatus");
-    res.json({ success: true, message: "ConexiÃƒÂ³n a SQL Server exitosa", data: result.recordset });
+    res.json({ success: true, message: "ConexiíÆíÂ³n a SQL Server exitosa", data: result.recordset });
   } catch (err) {
-    console.error("Test DB fallÃƒÂ³:", err);
+    console.error("Test DB fallíÆíÂ³:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -117,12 +117,12 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
     await transporter.sendMail({
       from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
       to: Correo,
-      subject: 'RecuperaciÃ³n de ContraseÃ±a - APPB',
+      subject: 'RecuperaciíÂ³n de ContraseíÂ±a - APPB',
       html: `
         <h3>Hola, ${usuario.Nombre}</h3>
-        <p>Has solicitado restablecer tu contraseÃ±a.</p>
-        <p>Tu nueva contraseÃ±a temporal es: <strong>${nuevaClave}</strong></p>
-        <p>Te recomendamos cambiarla inmediatamente despuÃ©s de iniciar sesiÃ³n en el apartado de Perfil.</p>
+        <p>Has solicitado restablecer tu contraseíÂ±a.</p>
+        <p>Tu nueva contraseíÂ±a temporal es: <strong>${nuevaClave}</strong></p>
+        <p>Te recomendamos cambiarla inmediatamente despuíÂ©s de iniciar sesiíÂ³n en el apartado de Perfil.</p>
         <br/>
         <p>Atentamente,<br/>Equipo de Soporte APPB</p>
       `
@@ -334,7 +334,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       .input("IdGuia", sql.Int, req.params.id)
       .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
       
-    if (result.recordset.length === 0) return res.status(404).json({ error: "GuÃƒÂ­a no encontrada" });
+    if (result.recordset.length === 0) return res.status(404).json({ error: "GuíÆíÂ­a no encontrada" });
     const guia = result.recordset[0];
     
     try {
@@ -342,23 +342,23 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       await transporter.sendMail({
         from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
         to: correoDestino,
-        subject: `GuÃƒÂ­as de Ayuda - Sistema de Incidencias APPB`,
+        subject: `GuíÆíÂ­as de Ayuda - Sistema de Incidencias APPB`,
         html: `
           <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
           <hr />
           <h4 style="color: #153250;">Problema:</h4>
           <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
           <br/>
-          <h4 style="color: #153250;">SoluciÃƒÂ³n recomendada:</h4>
+          <h4 style="color: #153250;">SoluciíÆíÂ³n recomendada:</h4>
           <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
           <hr />
-          <p style="font-size: 12px; color: gray;">Generado por Sistema de GestiÃƒÂ³n de Incidencias APPB</p>
+          <p style="font-size: 12px; color: gray;">Generado por Sistema de GestiíÆíÂ³n de Incidencias APPB</p>
         `
       });
       res.json({ success: true, message: "Correo enviado exitosamente" });
     } catch (mailErr) {
-      console.error("Error al enviar guÃƒÂ­a:", mailErr.message);
-      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuraciÃƒÂ³n SMTP." });
+      console.error("Error al enviar guíÆíÂ­a:", mailErr.message);
+      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuraciíÆíÂ³n SMTP." });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -483,15 +483,15 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         await transporter.sendMail({
           from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
           to: userEmail,
-          subject: "RecuperaciÃƒÂ³n de contraseÃƒÂ±a - Sistema de Incidencias APPB",
-          text: `Hola,\n\nTu contraseÃƒÂ±a temporal ha sido generada exitosamente.\n\nNueva contraseÃƒÂ±a: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cÃƒÂ¡mbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
+          subject: "RecuperaciíÆíÂ³n de contraseíÆíÂ±a - Sistema de Incidencias APPB",
+          text: `Hola,\n\nTu contraseíÆíÂ±a temporal ha sido generada exitosamente.\n\nNueva contraseíÆíÂ±a: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cíÆíÂ¡mbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
         });
       } catch (mailErr) {
         console.error("No se pudo enviar el correo de reset:", mailErr.message);
       }
     }
 
-    res.json({ success: true, message: "ContraseÃƒÂ±a actualizada" });
+    res.json({ success: true, message: "ContraseíÆíÂ±a actualizada" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -626,10 +626,7 @@ app.get("/api/incidencias/:id", async (req, res) => {
 
 app.post("/api/incidencias", async (req, res) => {
   try {
-    const { Descripcion, IdPrioridad, IdArea, Empleado, TipoIncidencia } = req.body;
-    if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado invÃƒÂ¡lido" });
-    if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo invÃƒÂ¡lido" });
-    if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "DescripciÃƒÂ³n muy corta" });
+    const { Descripción muy corta" });
 
     const pool = await getSqlServerDb();
     const estados = await pool.request().query("SELECT IdEstado FROM Estados WHERE Nombre = 'Pendiente'");
@@ -649,7 +646,7 @@ app.post("/api/incidencias", async (req, res) => {
               VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, @Fecha, @EscaladoSLA)`);
               
     const newId = result.recordset[0].IdIncidencia;
-    await registrarAuditoria(pool, req, "Crear", newId, "CreÃƒÂ³ la incidencia");
+    await registrarAuditoria(pool, req, "Creó la incidencia");
     
     const newIn = await pool.request().input("IdIncidencia", sql.Int, newId).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     res.status(201).json(newIn.recordset[0]);
@@ -680,39 +677,7 @@ app.put("/api/incidencias/:id", async (req, res) => {
       const idCerrado = estados.recordset.find(e => e.Nombre === "Cerrado")?.IdEstado;
       if ((IdEstado === idResuelto || IdEstado === idCerrado)) {
          const tecFinal = IdTecnicoAsignado !== undefined ? IdTecnicoAsignado : actual.IdTecnicoAsignado;
-         if (!tecFinal) return res.status(400).json({ message: "Requiere tÃƒÂ©cnico asignado" });
-         if (!actual.FechaSolucion) setClauses.push("FechaSolucion = GETDATE()");
-      }
-      accionesAuditoria.push("CambiÃƒÂ³ estado");
-    }
-
-    if (IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado) {
-      setClauses.push("IdTecnicoAsignado = @IdTecnicoAsignado");
-      request.input("IdTecnicoAsignado", sql.Int, IdTecnicoAsignado);
-      accionesAuditoria.push(IdTecnicoAsignado ? "Se asignÃƒÂ³ el ticket" : "Se desasignÃƒÂ³");
-    }
-
-    if (Observaciones !== undefined && Observaciones !== actual.Observaciones) {
-      setClauses.push("Observaciones = @Observaciones");
-      request.input("Observaciones", sql.VarChar, Observaciones);
-      accionesAuditoria.push("ModificÃƒÂ³ observaciones");
-    }
-
-    if (setClauses.length > 0) {
-      await request.query(`UPDATE Incidencias SET ${setClauses.join(", ")} WHERE IdIncidencia = @IdIncidencia`);
-      const accion = accionesAuditoria.some(a => a.includes("asign")) ? "Asignar" : "Editar";
-      await registrarAuditoria(pool, req, accion, req.params.id, accionesAuditoria.join(". "));
-    }
-    
-    res.json({ success: true });
-  } catch(err) { console.error(err); res.status(500).json({ error: err.message }); }
-});
-
-app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
-  try {
-    const pool = await getSqlServerDb();
-    await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
-    await registrarAuditoria(pool, req, "Eliminar", req.params.id, "EliminÃƒÂ³ el ticket permanentemente");
+         if (!tecFinal) return res.status(400).json({ message: "Requiere técnicoAsignado ? "Se asignó el ticket permanentemente");
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });

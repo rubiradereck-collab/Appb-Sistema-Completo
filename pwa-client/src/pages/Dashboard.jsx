@@ -21,12 +21,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000);
+    const interval = setInterval(() => fetchData(true), 15000);
     return () => clearInterval(interval);
   }, [periodo]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isAutoRefresh = false) => {
+    if (!isAutoRefresh) setLoading(true);
     try {
       const [incRes, estRes, areaRes] = await Promise.all([
         api.get('/incidencias'),
@@ -39,7 +39,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching data', error);
     }
-    setLoading(false);
+    if (!isAutoRefresh) setLoading(false);
   };
 
   // Cálculos de tarjetas
@@ -278,7 +278,7 @@ const Dashboard = () => {
                 <span className="hidden md:inline">Enviar Reporte</span>
               </button>
             )}
-            <button onClick={fetchData} className="btn-primary py-2.5 px-4">
+            <button onClick={() => fetchData(false)} className="btn-primary py-2.5 px-4">
               <FiRefreshCw className={loading ? "animate-spin" : ""} />
               <span className="hidden sm:inline">Refrescar</span>
             </button>

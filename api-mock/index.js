@@ -24,7 +24,7 @@ const enviarTelegram = async (chatId, text) => {
 const notificarNuevaIncidencia = async (pool, incidencia) => {
   try {
     const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
-    const mensaje = `ðŸ†• Nueva Incidencia #${incidencia.IdIncidencia} (App MÃ³vil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const mensaje = `ðŸ†• Nueva Incidencia #${incidencia.IdIncidencia} (App Móvil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
     for (const t of tecnicos.recordset) {
       await enviarTelegram(t.TelegramChatId, mensaje);
     }
@@ -63,7 +63,7 @@ app.use(express.json({ limit: "10mb" }));
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
 
-// ConfiguraciÃƒÂ³n Nodemailer
+// Configuración Nodemailer
 const getTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -85,7 +85,7 @@ app.get("/api/test-db", async (req, res) => {
     const result = await pool.request().query("SELECT 1 AS TestStatus");
     res.json({ success: true, message: "Conexión a SQL Server exitosa", data: result.recordset });
   } catch (err) {
-    console.error("Test DB fallÃƒÂ³:", err);
+    console.error("Test DB falló:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -120,9 +120,9 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
       subject: 'Recuperación de Contraseña - APPB',
       html: `
         <h3>Hola, ${usuario.Nombre}</h3>
-        <p>Has solicitado restablecer tu contraseÃ±a.</p>
-        <p>Tu nueva contraseÃ±a temporal es: <strong>${nuevaClave}</strong></p>
-        <p>Te recomendamos cambiarla inmediatamente despuÃ©s de iniciar sesiÃ³n en el apartado de Perfil.</p>
+        <p>Has solicitado restablecer tu contraseña.</p>
+        <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
+        <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
         <br/>
         <p>Atentamente,<br/>Equipo de Soporte APPB</p>
       `
@@ -334,7 +334,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       .input("IdGuia", sql.Int, req.params.id)
       .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
       
-    if (result.recordset.length === 0) return res.status(404).json({ error: "GuÃƒÂ­a no encontrada" });
+    if (result.recordset.length === 0) return res.status(404).json({ error: "Guía no encontrada" });
     const guia = result.recordset[0];
     
     try {
@@ -342,14 +342,14 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       await transporter.sendMail({
         from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
         to: correoDestino,
-        subject: `GuÃƒÂ­as de Ayuda - Sistema de Incidencias APPB`,
+        subject: `Guías de Ayuda - Sistema de Incidencias APPB`,
         html: `
           <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
           <hr />
           <h4 style="color: #153250;">Problema:</h4>
           <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
           <br/>
-          <h4 style="color: #153250;">SoluciÃƒÂ³n recomendada:</h4>
+          <h4 style="color: #153250;">Solución recomendada:</h4>
           <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
           <hr />
           <p style="font-size: 12px; color: gray;">Generado por Sistema de Gestión de Incidencias APPB</p>
@@ -357,8 +357,8 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       });
       res.json({ success: true, message: "Correo enviado exitosamente" });
     } catch (mailErr) {
-      console.error("Error al enviar guÃƒÂ­a:", mailErr.message);
-      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuraciÃƒÂ³n SMTP." });
+      console.error("Error al enviar guía:", mailErr.message);
+      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuración SMTP." });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -483,8 +483,8 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         await transporter.sendMail({
           from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
           to: userEmail,
-          subject: "Recuperación de contraseÃƒÂ±a - Sistema de Incidencias APPB",
-          text: `Hola,\n\nTu contraseÃƒÂ±a temporal ha sido generada exitosamente.\n\nNueva contraseÃƒÂ±a: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cÃƒÂ¡mbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
+          subject: "Recuperación de contraseña - Sistema de Incidencias APPB",
+          text: `Hola,\n\nTu contraseña temporal ha sido generada exitosamente.\n\nNueva contraseña: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cámbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
         });
       } catch (mailErr) {
         console.error("No se pudo enviar el correo de reset:", mailErr.message);

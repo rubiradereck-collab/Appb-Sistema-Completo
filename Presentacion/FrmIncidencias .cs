@@ -17,6 +17,7 @@ namespace Presentacion
 {
     public partial class FrmIncidencias : Form
     {
+        private bool modoNuevaIncidencia = false;
         private readonly AuditoriaLN auditoriaLN = new AuditoriaLN();
         private readonly IncidenciaLN incidenciaLN = new IncidenciaLN();
         private readonly AreaLN areaLN = new AreaLN();
@@ -52,7 +53,7 @@ namespace Presentacion
             AplicarRestriccionesPorRol();
             CargarGrid();
             LimpiarFormulario();
-            tmrRefresco.Tick += (s, e) => { if (incidenciaSeleccionada == null) CargarGrid(); };
+            tmrRefresco.Tick += (s, e) => { if (incidenciaSeleccionada == null && !modoNuevaIncidencia) CargarGrid(); };
             tmrRefresco.Start();
             this.FormClosed += (s, e) => tmrRefresco.Stop();
         }
@@ -227,6 +228,7 @@ namespace Presentacion
 
         private void grid_SelectionChanged(object sender, EventArgs e)
         {
+            modoNuevaIncidencia = false;
             if (grid.CurrentRow == null) return;
             incidenciaSeleccionada = grid.CurrentRow.DataBoundItem as Incidencia;
             if (incidenciaSeleccionada == null) return;
@@ -249,6 +251,7 @@ namespace Presentacion
         private void btnNuevo_Click(object sender, EventArgs e)
         {
             LimpiarFormulario();
+            modoNuevaIncidencia = true;
 
         }
 
@@ -425,6 +428,7 @@ namespace Presentacion
 
                 CargarGrid();
                 LimpiarFormulario();
+                modoNuevaIncidencia = false;
                 MessageBox.Show("Guardado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -563,4 +567,5 @@ namespace Presentacion
         }
     }
 }
+
 

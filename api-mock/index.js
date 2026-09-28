@@ -8,7 +8,7 @@ const { getSqlServerDb, sql } = require("./db_sqlserver");
 
 const axios = require('axios');
 
-﻿const enviarTelegram = async (chatId, text) => {
+const enviarTelegram = async (chatId, text) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token || !chatId) return;
   try {
@@ -23,8 +23,8 @@ const axios = require('axios');
 
 const notificarNuevaIncidencia = async (pool, incidencia) => {
   try {
-    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
-    const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (App Móvil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'TÃ©cnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
+    const mensaje = `ðŸ†• Nueva Incidencia #${incidencia.IdIncidencia} (App MÃ³vil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripciÃ³n: ${incidencia.Descripcion}`;
     for (const t of tecnicos.recordset) {
       await enviarTelegram(t.TelegramChatId, mensaje);
     }
@@ -42,9 +42,9 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
 
     let mensaje = '';
     if (accion === 'asignar') {
-      mensaje = `🔔 Se te ha asignado la Incidencia #${incidenciaId}`;
+      mensaje = `ðŸ”” Se te ha asignado la Incidencia #${incidenciaId}`;
     } else if (accion === 'estado') {
-      mensaje = `ℹ️ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+      mensaje = `â„¹ï¸ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
     }
     
     if (mensaje) await enviarTelegram(chatId, mensaje);
@@ -63,7 +63,7 @@ app.use(express.json({ limit: "10mb" }));
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
 
-// ConfiguraciÃ³n Nodemailer
+// ConfiguraciÃƒÂ³n Nodemailer
 const getTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -83,9 +83,9 @@ app.get("/api/test-db", async (req, res) => {
   try {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT 1 AS TestStatus");
-    res.json({ success: true, message: "ConexiÃ³n a SQL Server exitosa", data: result.recordset });
+    res.json({ success: true, message: "ConexiÃƒÂ³n a SQL Server exitosa", data: result.recordset });
   } catch (err) {
-    console.error("Test DB fallÃ³:", err);
+    console.error("Test DB fallÃƒÂ³:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -111,18 +111,18 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
     await pool.request()
       .input('Id', sql.Int, usuario.IdUsuario)
       .input('Hash', sql.VarChar, hash)
-      .query('UPDATE Usuarios SET HashPassword = @Hash WHERE IdUsuario = @Id');
+      .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
 
     const transporter = getTransporter();
     await transporter.sendMail({
       from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
       to: Correo,
-      subject: 'Recuperación de Contraseña - APPB',
+      subject: 'RecuperaciÃ³n de ContraseÃ±a - APPB',
       html: `
         <h3>Hola, ${usuario.Nombre}</h3>
-        <p>Has solicitado restablecer tu contraseña.</p>
-        <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
-        <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+        <p>Has solicitado restablecer tu contraseÃ±a.</p>
+        <p>Tu nueva contraseÃ±a temporal es: <strong>${nuevaClave}</strong></p>
+        <p>Te recomendamos cambiarla inmediatamente despuÃ©s de iniciar sesiÃ³n en el apartado de Perfil.</p>
         <br/>
         <p>Atentamente,<br/>Equipo de Soporte APPB</p>
       `
@@ -210,6 +210,35 @@ const verifyToken = (req, res, next) => {
     next();
   });
 };;
+app.post('/api/interno/notificar', async (req, res) => {
+  if (req.headers['x-internal-key'] !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+  try {
+    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion } = req.body;
+    const pool = await getSqlServerDb();
+
+    if (tipoEvento === 'nueva') {
+      const mockIncidencia = { 
+        IdIncidencia: idIncidencia, 
+        Empleado: empleado || 'N/A', 
+        TipoIncidencia: tipoIncidencia || 'N/A', 
+        Descripcion: descripcion || '' 
+      };
+      await notificarNuevaIncidencia(pool, mockIncidencia);
+    } else if (tipoEvento === 'asignar') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
+    } else if (tipoEvento === 'estado') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'estado', idTecnicoAsignado, nuevoEstado);
+    }
+    
+    return res.status(200).json({ message: 'Notificaciones enviadas' });
+  } catch (err) {
+    console.error('Error interno notificar:', err);
+    return res.status(500).json({ message: 'Error enviando notificaciones' });
+  }
+});
+
 app.use(verifyToken);
 
 const requireAdmin = (req, res, next) => {
@@ -305,7 +334,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       .input("IdGuia", sql.Int, req.params.id)
       .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
       
-    if (result.recordset.length === 0) return res.status(404).json({ error: "GuÃ­a no encontrada" });
+    if (result.recordset.length === 0) return res.status(404).json({ error: "GuÃƒÂ­a no encontrada" });
     const guia = result.recordset[0];
     
     try {
@@ -313,23 +342,23 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       await transporter.sendMail({
         from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
         to: correoDestino,
-        subject: `GuÃ­as de Ayuda - Sistema de Incidencias APPB`,
+        subject: `GuÃƒÂ­as de Ayuda - Sistema de Incidencias APPB`,
         html: `
           <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
           <hr />
           <h4 style="color: #153250;">Problema:</h4>
           <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
           <br/>
-          <h4 style="color: #153250;">SoluciÃ³n recomendada:</h4>
+          <h4 style="color: #153250;">SoluciÃƒÂ³n recomendada:</h4>
           <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
           <hr />
-          <p style="font-size: 12px; color: gray;">Generado por Sistema de GestiÃ³n de Incidencias APPB</p>
+          <p style="font-size: 12px; color: gray;">Generado por Sistema de GestiÃƒÂ³n de Incidencias APPB</p>
         `
       });
       res.json({ success: true, message: "Correo enviado exitosamente" });
     } catch (mailErr) {
-      console.error("Error al enviar guÃ­a:", mailErr.message);
-      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuraciÃ³n SMTP." });
+      console.error("Error al enviar guÃƒÂ­a:", mailErr.message);
+      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuraciÃƒÂ³n SMTP." });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -454,15 +483,15 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         await transporter.sendMail({
           from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
           to: userEmail,
-          subject: "RecuperaciÃ³n de contraseÃ±a - Sistema de Incidencias APPB",
-          text: `Hola,\n\nTu contraseÃ±a temporal ha sido generada exitosamente.\n\nNueva contraseÃ±a: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cÃ¡mbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
+          subject: "RecuperaciÃƒÂ³n de contraseÃƒÂ±a - Sistema de Incidencias APPB",
+          text: `Hola,\n\nTu contraseÃƒÂ±a temporal ha sido generada exitosamente.\n\nNueva contraseÃƒÂ±a: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cÃƒÂ¡mbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
         });
       } catch (mailErr) {
         console.error("No se pudo enviar el correo de reset:", mailErr.message);
       }
     }
 
-    res.json({ success: true, message: "ContraseÃ±a actualizada" });
+    res.json({ success: true, message: "ContraseÃƒÂ±a actualizada" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -598,9 +627,9 @@ app.get("/api/incidencias/:id", async (req, res) => {
 app.post("/api/incidencias", async (req, res) => {
   try {
     const { Descripcion, IdPrioridad, IdArea, Empleado, TipoIncidencia } = req.body;
-    if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado invÃ¡lido" });
-    if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo invÃ¡lido" });
-    if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "DescripciÃ³n muy corta" });
+    if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado invÃƒÂ¡lido" });
+    if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo invÃƒÂ¡lido" });
+    if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "DescripciÃƒÂ³n muy corta" });
 
     const pool = await getSqlServerDb();
     const estados = await pool.request().query("SELECT IdEstado FROM Estados WHERE Nombre = 'Pendiente'");
@@ -620,7 +649,7 @@ app.post("/api/incidencias", async (req, res) => {
               VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, @Fecha, @EscaladoSLA)`);
               
     const newId = result.recordset[0].IdIncidencia;
-    await registrarAuditoria(pool, req, "Crear", newId, "CreÃ³ la incidencia");
+    await registrarAuditoria(pool, req, "Crear", newId, "CreÃƒÂ³ la incidencia");
     
     const newIn = await pool.request().input("IdIncidencia", sql.Int, newId).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     res.status(201).json(newIn.recordset[0]);
@@ -651,22 +680,22 @@ app.put("/api/incidencias/:id", async (req, res) => {
       const idCerrado = estados.recordset.find(e => e.Nombre === "Cerrado")?.IdEstado;
       if ((IdEstado === idResuelto || IdEstado === idCerrado)) {
          const tecFinal = IdTecnicoAsignado !== undefined ? IdTecnicoAsignado : actual.IdTecnicoAsignado;
-         if (!tecFinal) return res.status(400).json({ message: "Requiere tÃ©cnico asignado" });
+         if (!tecFinal) return res.status(400).json({ message: "Requiere tÃƒÂ©cnico asignado" });
          if (!actual.FechaSolucion) setClauses.push("FechaSolucion = GETDATE()");
       }
-      accionesAuditoria.push("CambiÃ³ estado");
+      accionesAuditoria.push("CambiÃƒÂ³ estado");
     }
 
     if (IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado) {
       setClauses.push("IdTecnicoAsignado = @IdTecnicoAsignado");
       request.input("IdTecnicoAsignado", sql.Int, IdTecnicoAsignado);
-      accionesAuditoria.push(IdTecnicoAsignado ? "Se asignÃ³ el ticket" : "Se desasignÃ³");
+      accionesAuditoria.push(IdTecnicoAsignado ? "Se asignÃƒÂ³ el ticket" : "Se desasignÃƒÂ³");
     }
 
     if (Observaciones !== undefined && Observaciones !== actual.Observaciones) {
       setClauses.push("Observaciones = @Observaciones");
       request.input("Observaciones", sql.VarChar, Observaciones);
-      accionesAuditoria.push("ModificÃ³ observaciones");
+      accionesAuditoria.push("ModificÃƒÂ³ observaciones");
     }
 
     if (setClauses.length > 0) {
@@ -683,7 +712,7 @@ app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
   try {
     const pool = await getSqlServerDb();
     await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
-    await registrarAuditoria(pool, req, "Eliminar", req.params.id, "EliminÃ³ el ticket permanentemente");
+    await registrarAuditoria(pool, req, "Eliminar", req.params.id, "EliminÃƒÂ³ el ticket permanentemente");
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
@@ -715,6 +744,7 @@ app.get('/api/reportes/incidencias/excel', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API (SQL Server backend) running on http://localhost:${PORT}`);
 });
+
 
 
 

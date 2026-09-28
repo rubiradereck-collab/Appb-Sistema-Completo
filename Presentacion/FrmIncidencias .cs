@@ -272,82 +272,44 @@ namespace Presentacion
             txtEmpleado.Focus();
         }
 
+                private async Task NotificarA_NodeAPI(string tipoEvento, Incidencia inc, string nuevoEstado)
+        {
+            try
+            {
+                string apiUrl = System.Configuration.ConfigurationManager.AppSettings["NodeApiUrl"] ?? "http://131.150.25.22:3001";
+                string apiKey = System.Configuration.ConfigurationManager.AppSettings["InternalApiKey"] ?? "secreto_interno_123_qwe_rty";
+                
+                using (var client = new System.Net.Http.HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("x-internal-key", apiKey);
+                    string descripcionEscape = inc.Descripcion?.Replace(""", "\"").Replace("
+", "\n").Replace("", "") ?? "";
+                    string empleadoEscape = inc.Empleado?.Replace(""", "\"") ?? "";
+                    string tipoEscape = inc.TipoIncidencia?.Replace(""", "\"") ?? "";
+                    string idAsignado = inc.IdTecnicoAsignado.HasValue ? inc.IdTecnicoAsignado.Value.ToString() : "null";
+                    
+                    string json = $"{{\"tipoEvento\":\"{tipoEvento}\",\"idIncidencia\":{inc.IdIncidencia},\"idTecnicoAsignado\":{idAsignado},\"nuevoEstado\":\"{nuevoEstado}\",\"empleado\":\"{empleadoEscape}\",\"tipoIncidencia\":\"{tipoEscape}\",\"descripcion\":\"{descripcionEscape}\"}}";
+                    
+                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                    await client.PostAsync($"{apiUrl}/api/interno/notificar", content);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error disparando notificacion centralizada: {ex.Message}");
+            }
+        }
+
         private async Task EnviarNotificacionSiCorresponde(Incidencia incidencia, string nombreEstadoNuevo)
         {
             if (nombreEstadoNuevo != "Resuelto" && nombreEstadoNuevo != "Cerrado") return;
             if (!incidencia.IdTecnicoAsignado.HasValue) return;
-
-            try
-            {
-                Usuario tecnico = usuarioLN.ShowUsuario()
-                    .FirstOrDefault(u => u.IdUsuario == incidencia.IdTecnicoAsignado.Value);
-
-                if (tecnico?.TelegramChatId == null) return; // técnico no vinculado, no se puede avisar
-
-                string mensaje =
-                    $"✅ Incidencia {incidencia.NumeroTicket} marcada como {nombreEstadoNuevo}.\n\n" +
-                    $"Empleado: {incidencia.Empleado}\nTipo: {incidencia.TipoIncidencia}";
-
-                Bot.TelegramNotificador.EnviarMensaje(tecnico.TelegramChatId.Value, mensaje);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error detectado al enviar Telegram:\n\n{ex.ToString()}", "Error Oculto", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // Best effort: si falla el envío, no debe romper el guardado de la incidencia.
-            }
+            await NotificarA_NodeAPI("estado", incidencia, nombreEstadoNuevo);
         }
 
         private async Task NotificarNuevaIncidenciaATecnicosAsync(Incidencia incidenciaNueva)
         {
-            try
-            {
-                List<Usuario> destinatarios;
-                bool yaAsignada = incidenciaNueva.IdTecnicoAsignado.HasValue;
-
-                if (yaAsignada)
-                {
-                    var tecnicoAsignado = usuarioLN.ShowUsuario()
-                        .FirstOrDefault(u => u.IdUsuario == incidenciaNueva.IdTecnicoAsignado.Value && u.TelegramChatId.HasValue);
-                    destinatarios = tecnicoAsignado != null ? new List<Usuario> { tecnicoAsignado } : new List<Usuario>();
-                }
-                else
-                {
-                    destinatarios = usuarioLN.ShowUsuario()
-                        .Where(u => u.Rol == "Técnico" && u.Estado && u.TelegramChatId.HasValue)
-                        .ToList();
-                }
-
-                if (destinatarios.Count == 0) return;
-
-                string instruccion = yaAsignada
-                    ? "_Este ticket ya te fue asignado directamente desde el sistema de escritorio._"
-                    : "_Por favor, ingresa al sistema de escritorio para asignarte este ticket._";
-
-                string mensaje = $"🚨 *NUEVA INCIDENCIA REPORTADA* 🚨\n\n" +
-                                 $"*Ticket:* {incidenciaNueva.NumeroTicket}\n" +
-                                 $"*Empleado:* {incidenciaNueva.Empleado}\n" +
-                                 $"*Área:* {cboArea.Text}\n" +
-                                 $"*Tipo:* {incidenciaNueva.TipoIncidencia}\n" +
-                                 $"*Prioridad:* {cboPrioridad.Text}\n\n" +
-                                 $"*Descripción:*\n{incidenciaNueva.Descripcion}\n\n" +
-                                 instruccion;
-
-                foreach (var tecnico in destinatarios)
-                {
-                    int? messageId = yaAsignada
-     ? await Bot.TelegramNotificador.EnviarMensajeAsignadoAsync(tecnico.TelegramChatId.Value, mensaje, incidenciaNueva.IdIncidencia)
-     : await Bot.TelegramNotificador.EnviarMensajeAsync(tecnico.TelegramChatId.Value, mensaje, incidenciaNueva.IdIncidencia);
-
-                    if (messageId.HasValue)
-                    {
-                        incidenciaLN.RegistrarMensajeTelegram(incidenciaNueva.IdIncidencia, tecnico.TelegramChatId.Value, messageId.Value);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error detectado al enviar Telegram: {ex.Message}");
-            }
+            await NotificarA_NodeAPI("nueva", incidenciaNueva, "");
         }
 
         private async void btnGuardar_Click(object sender, EventArgs e)

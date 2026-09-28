@@ -211,7 +211,7 @@ const verifyToken = (req, res, next) => {
   });
 };;
 app.post('/api/interno/notificar', async (req, res) => {
-  if (req.headers['x-internal-key'] !== process.env.INTERNAL_API_KEY) {
+  if (!process.env.INTERNAL_API_KEY || req.headers['x-internal-key'] !== process.env.INTERNAL_API_KEY) {
     return res.status(403).json({ message: 'No autorizado' });
   }
   try {

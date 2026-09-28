@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { FiAlertCircle } from 'react-icons/fi';
@@ -29,11 +29,11 @@ const ToastMessage = () => {
   useEffect(() => {
     const handleAppError = (e) => {
       setToast({ message: e.detail, type: 'error' });
-      setTimeout(() => setToast(null), 4000);
+      setTimeout(() => setToast(null), 8000);
     };
     const handleAppSuccess = (e) => {
       setToast({ message: e.detail, type: 'success' });
-      setTimeout(() => setToast(null), 4000);
+      setTimeout(() => setToast(null), 8000);
     };
     window.addEventListener('app-error', handleAppError);
     window.addEventListener('app-success', handleAppSuccess);
@@ -62,16 +62,16 @@ function App() {
           <Route path="/" element={<Navigate to="/incidencias" replace />} />
           <Route path="/login" element={<Login />} />
           
-          {/* Dashboard: Solo Admin y Técnico (Usuarios regulares van directo a sus tickets) */}
-          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Administrador', 'Técnico']}><Dashboard /></ProtectedRoute>} />
+          {/* Dashboard: Solo Admin y TÃ©cnico (Usuarios regulares van directo a sus tickets) */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Administrador', 'TÃ©cnico']}><Dashboard /></ProtectedRoute>} />
           
           {/* Incidencias (Todos) */}
           <Route path="/incidencias" element={<ProtectedRoute><Incidencias /></ProtectedRoute>} />
           
-          {/* Mis Tickets (Solo Técnicos) */}
-          <Route path="/mis-tickets" element={<ProtectedRoute allowedRoles={['Técnico']}><Incidencias filterTecnico={true} /></ProtectedRoute>} />
+          {/* Mis Tickets (Solo TÃ©cnicos) */}
+          <Route path="/mis-tickets" element={<ProtectedRoute allowedRoles={['TÃ©cnico']}><Incidencias filterTecnico={true} /></ProtectedRoute>} />
           
-          {/* Detalle, Perfil y Guías (Todos) */}
+          {/* Detalle, Perfil y GuÃ­as (Todos) */}
           <Route path="/incidencia/:id" element={<ProtectedRoute><IncidentDetail /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/guias" element={<ProtectedRoute><Guias /></ProtectedRoute>} />
@@ -79,7 +79,7 @@ function App() {
           {/* Nueva (Solo Admin y Usuarios) */}
           <Route path="/nueva" element={<ProtectedRoute allowedRoles={['Administrador', 'Usuario']}><NewIncident /></ProtectedRoute>} />
           
-          {/* Administración (Solo Admin) */}
+          {/* AdministraciÃ³n (Solo Admin) */}
           <Route path="/usuarios" element={<ProtectedRoute allowedRoles={['Administrador']}><Usuarios /></ProtectedRoute>} />
           <Route path="/areas" element={<ProtectedRoute allowedRoles={['Administrador']}><Areas /></ProtectedRoute>} />
           <Route path="/auditoria" element={<ProtectedRoute allowedRoles={['Administrador']}><Auditoria /></ProtectedRoute>} />
@@ -90,3 +90,4 @@ function App() {
 }
 
 export default App;
+

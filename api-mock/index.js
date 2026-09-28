@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -53,8 +53,6 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
   }
 };
 
-  }
-};
 const app = express();
 app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url);next();});
 app.use(cors());
@@ -89,6 +87,51 @@ app.get("/api/test-db", async (req, res) => {
   } catch (err) {
     console.error("Test DB fallÃ³:", err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/recuperar-password', async (req, res) => {
+  try {
+    const { Correo } = req.body;
+    if (!Correo) return res.status(400).json({ message: 'Correo requerido' });
+
+    const pool = await getSqlServerDb();
+    const userRes = await pool.request()
+      .input('Correo', sql.VarChar, Correo)
+      .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = 1');
+
+    if (userRes.recordset.length === 0) {
+      return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+    }
+
+    const usuario = userRes.recordset[0];
+    const nuevaClave = Math.random().toString(36).slice(-8); 
+    const hash = await bcrypt.hash(nuevaClave, 10);
+
+    await pool.request()
+      .input('Id', sql.Int, usuario.IdUsuario)
+      .input('Hash', sql.VarChar, hash)
+      .query('UPDATE Usuarios SET HashPassword = @Hash WHERE IdUsuario = @Id');
+
+    const transporter = getTransporter();
+    await transporter.sendMail({
+      from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
+      to: Correo,
+      subject: 'Recuperación de Contraseña - APPB',
+      html: `
+        <h3>Hola, ${usuario.Nombre}</h3>
+        <p>Has solicitado restablecer tu contraseña.</p>
+        <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
+        <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+        <br/>
+        <p>Atentamente,<br/>Equipo de Soporte APPB</p>
+      `
+    });
+
+    res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+  } catch (err) {
+    console.error('Error recuperando password:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
@@ -672,6 +715,7 @@ app.get('/api/reportes/incidencias/excel', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API (SQL Server backend) running on http://localhost:${PORT}`);
 });
+
 
 
 

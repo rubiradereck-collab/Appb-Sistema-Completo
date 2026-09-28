@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
-import { FiUser, FiEye, FiEyeOff, FiLock } from 'react-icons/fi';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../AuthContext";
+import { FiUser, FiEye, FiEyeOff, FiLock, FiMail, FiX } from "react-icons/fi";
+import api from "../api";
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -11,6 +12,26 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState({ text: "", type: "" });
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    setForgotMsg({ text: "", type: "" });
+    try {
+      const res = await api.post("/auth/recuperar-password", { Correo: forgotEmail });
+      setForgotMsg({ text: res.data.message || "Se han enviado las instrucciones.", type: "success" });
+    } catch (err) {
+      setForgotMsg({ text: "No se pudo enviar el correo o no existe.", type: "error" });
+    }
+    setForgotLoading(false);
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,6 +65,39 @@ const Login = () => {
         </div>
       </div>
 
+
+      {/* Modal Olvide Contrasena */}
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative animate-fadeIn">
+            <button onClick={() => setShowForgotModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+              <FiX className="text-2xl" />
+            </button>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">Recuperar Contraseña</h3>
+            <p className="text-gray-500 mb-6 text-sm">Ingresa tu correo electrónico registrado y te enviaremos una clave temporal.</p>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <FiMail className="text-gray-400 text-lg" />
+                  </div>
+                  <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue text-gray-800"
+                    placeholder="tu.correo@appb.gob.ec" />
+                </div>
+              </div>
+              {forgotMsg.text && (
+                <div className={"text-sm py-3 px-4 rounded-xl flex items-center space-x-2 " + (forgotMsg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600")}>
+                  <span>{forgotMsg.text}</span>
+                </div>
+              )}
+              <button type="submit" disabled={forgotLoading} className="w-full bg-brand-blue hover:bg-blue-600 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md">
+                {forgotLoading ? "Enviando..." : "ENVIAR CORREO"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Lado Derecho: Formulario */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-brand-light relative">
         <div className="w-full max-w-md">
@@ -105,7 +159,7 @@ const Login = () => {
                   <input type="checkbox" className="w-4 h-4 text-brand-blue rounded border-gray-300 focus:ring-brand-blue" />
                   <span className="text-sm text-gray-600">Recordarme</span>
                 </label>
-                <a href="#" className="text-sm font-bold text-brand-blue hover:text-brand-hover transition-colors">
+                                <a href="#" onClick={(e) => { e.preventDefault(); setShowForgotModal(true); setForgotMsg({text:"", type:""}); setForgotEmail(""); }} className="text-sm font-bold text-brand-blue hover:text-brand-hover transition-colors">
                   ¿Olvidaste tu contraseña?
                 </a>
               </div>

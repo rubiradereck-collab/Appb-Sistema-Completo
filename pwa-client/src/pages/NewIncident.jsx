@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import api from '../api';
@@ -22,7 +22,7 @@ const NewIncident = () => {
   });
 
   useEffect(() => {
-    // Cargar catálogos
+    // Cargar catÃ¡logos
     const fetchData = async () => {
       try {
         const [arRes, prRes] = await Promise.all([
@@ -34,7 +34,7 @@ const NewIncident = () => {
         if (arRes.data.length > 0) setFormData(f => ({ ...f, IdArea: arRes.data[0].IdArea }));
         if (prRes.data.length > 0) setFormData(f => ({ ...f, IdPrioridad: prRes.data[0].IdPrioridad }));
       } catch (error) {
-        console.error('Error cargando catálogos', error);
+        console.error('Error cargando catÃ¡logos', error);
       }
     };
     fetchData();
@@ -52,11 +52,11 @@ const NewIncident = () => {
     setGuardando(true);
     try {
       await api.post('/incidencias', formData);
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia creada con éxito'}));
+      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia creada con Ã©xito'}));
       setSuccessMsg(true);
       setTimeout(() => {
         navigate('/incidencias');
-      }, 1500);
+      }, 6000);
     } catch (error) {
       window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al crear la incidencia'}));
       setGuardando(false);
@@ -76,7 +76,7 @@ const NewIncident = () => {
           
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ãrea</label>
               <select 
                 name="IdArea"
                 value={formData.IdArea}
@@ -84,7 +84,7 @@ const NewIncident = () => {
                 required
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Seleccione un área</option>
+                <option value="">Seleccione un Ã¡rea</option>
                 {areas.map(a => (
                   <option key={a.IdArea} value={a.IdArea}>{a.NombreArea}</option>
                 ))}
@@ -102,7 +102,7 @@ const NewIncident = () => {
                 required
                 className="w-full px-4 py-3 bg-white rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {formData.Empleado.length >= 150 && <p className="text-xs text-red-500 mt-1">Límite de 150 caracteres alcanzado.</p>}
+              {formData.Empleado.length >= 150 && <p className="text-xs text-red-500 mt-1">LÃ­mite de 150 caracteres alcanzado.</p>}
             </div>
 
             <div>
@@ -117,11 +117,11 @@ const NewIncident = () => {
                 required
                 className="w-full px-4 py-3 bg-white rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {formData.TipoIncidencia.length >= 100 && <p className="text-xs text-red-500 mt-1">Límite de 100 caracteres alcanzado.</p>}
+              {formData.TipoIncidencia.length >= 100 && <p className="text-xs text-red-500 mt-1">LÃ­mite de 100 caracteres alcanzado.</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción Detallada</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">DescripciÃ³n Detallada</label>
               <textarea 
                 name="Descripcion"
                 value={formData.Descripcion}
@@ -152,7 +152,7 @@ const NewIncident = () => {
 
             {/* [FUNCIONALIDAD FUTURA] 
                 La BD original de WinForms no cuenta con una columna en la tabla Incidencias para guardar fotos.
-                Descomentar esto cuando se añada la columna FotoEvidencia VARBINARY(MAX) al SQL Server.
+                Descomentar esto cuando se aÃ±ada la columna FotoEvidencia VARBINARY(MAX) al SQL Server.
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Adjuntar Foto del Error</label>
               <input 
@@ -161,14 +161,14 @@ const NewIncident = () => {
                 capture="environment"
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
-              <p className="text-xs text-gray-500 mt-2">Puedes usar la cámara si estás en el celular.</p>
+              <p className="text-xs text-gray-500 mt-2">Puedes usar la cÃ¡mara si estÃ¡s en el celular.</p>
             </div>
             */}
 
             {successMsg ? (
               <div className="w-full bg-green-100 border border-green-400 text-green-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 mt-6">
                 <FiCheckCircle className="text-xl" />
-                <span>¡Incidencia creada con éxito!</span>
+                <span>Â¡Incidencia creada con Ã©xito!</span>
               </div>
             ) : (
               <button 
@@ -188,3 +188,4 @@ const NewIncident = () => {
 };
 
 export default NewIncident;
+

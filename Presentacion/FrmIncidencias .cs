@@ -385,7 +385,7 @@ namespace Presentacion
                     if (incidenciaCreada != null)
                     {
                         // AQUÍ ESTÁ LA MAGIA ASÍNCRONA
-                        await NotificarNuevaIncidenciaATecnicosAsync(incidenciaCreada);
+                        _ = NotificarNuevaIncidenciaATecnicosAsync(incidenciaCreada);
                     }
                 }
                 else
@@ -423,7 +423,7 @@ namespace Presentacion
                         incidenciaSeleccionada.IdIncidencia,
                         $"Ticket: {incidenciaSeleccionada.NumeroTicket} | Estado: {estadoAnterior} → {nuevoEstado}"
                     );
-                    await EnviarNotificacionSiCorresponde(incidenciaSeleccionada, nuevoEstado);
+                    _ = EnviarNotificacionSiCorresponde(incidenciaSeleccionada, nuevoEstado);
                 }
 
                 CargarGrid();
@@ -567,5 +567,6 @@ namespace Presentacion
         }
     }
 }
+
 
 

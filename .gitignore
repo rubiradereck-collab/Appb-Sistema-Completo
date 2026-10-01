@@ -382,3 +382,12 @@ Reportes/app.config
 # Global ignore for config files
 [Aa]pp.config
 
+
+*.bak
+DBIncidencias/
+DBIncidencias
+*.apk
+*.zip
+*.exe
+pwa-client/public/descargas/
+api-mock/public-descargas/

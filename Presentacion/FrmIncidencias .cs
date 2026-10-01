@@ -276,27 +276,38 @@ namespace Presentacion
         {
             try
             {
-                string apiUrl = System.Configuration.ConfigurationManager.AppSettings["NodeApiUrl"] ?? "http://131.150.25.22:3001";
-                string apiKey = System.Configuration.ConfigurationManager.AppSettings["InternalApiKey"] ?? "secreto_interno_123_qwe_rty";
+                string apiUrl = System.Configuration.ConfigurationManager.AppSettings["NodeApiUrl"];
+                string apiKey = System.Configuration.ConfigurationManager.AppSettings["InternalApiKey"];
+                
+                if (string.IsNullOrEmpty(apiUrl) || string.IsNullOrEmpty(apiKey))
+                {
+                    Console.WriteLine("NodeApiUrl o InternalApiKey no configurado. Se omite notificación.");
+                    return;
+                }
                 
                 using (var client = new System.Net.Http.HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("x-internal-key", apiKey);
-                    string descripcionEscape = inc.Descripcion?.Replace(""", "\"").Replace("
-", "\n").Replace("", "") ?? "";
-                    string empleadoEscape = inc.Empleado?.Replace(""", "\"") ?? "";
-                    string tipoEscape = inc.TipoIncidencia?.Replace(""", "\"") ?? "";
-                    string idAsignado = inc.IdTecnicoAsignado.HasValue ? inc.IdTecnicoAsignado.Value.ToString() : "null";
                     
-                    string json = $"{{\"tipoEvento\":\"{tipoEvento}\",\"idIncidencia\":{inc.IdIncidencia},\"idTecnicoAsignado\":{idAsignado},\"nuevoEstado\":\"{nuevoEstado}\",\"empleado\":\"{empleadoEscape}\",\"tipoIncidencia\":\"{tipoEscape}\",\"descripcion\":\"{descripcionEscape}\"}}";
+                    var payload = new {
+                        tipoEvento = tipoEvento,
+                        idIncidencia = inc.IdIncidencia,
+                        idTecnicoAsignado = inc.IdTecnicoAsignado,
+                        nuevoEstado = nuevoEstado,
+                        empleado = inc.Empleado ?? "",
+                        tipoIncidencia = inc.TipoIncidencia ?? "",
+                        descripcion = inc.Descripcion ?? "",
+                        origen = "Escritorio"
+                    };
                     
+                    string json = System.Text.Json.JsonSerializer.Serialize(payload);
                     var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    await client.PostAsync($"{apiUrl}/api/interno/notificar", content);
+                    _ = client.PostAsync($"{apiUrl}/api/interno/notificar", content);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error disparando notificacion centralizada: {ex.Message}");
+                Console.WriteLine($"Error al notificar al API Node: {ex.Message}");
             }
         }
 

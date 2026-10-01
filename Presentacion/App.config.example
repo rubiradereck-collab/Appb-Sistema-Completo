@@ -65,3 +65,6 @@
 		</assemblyBinding>
 	</runtime>
 </configuration>
+<!-- Agrega estas claves a tu App.config real: -->
+<!-- <add key="NodeApiUrl" value="http://131.150.25.22:3001" /> -->
+<!-- <add key="InternalApiKey" value="PONER_API_KEY_AQUI" /> -->

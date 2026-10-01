@@ -12,7 +12,6 @@ import Guias from './pages/Guias';
 import Usuarios from './pages/Usuarios';
 import Areas from './pages/Areas';
 import Auditoria from './pages/Auditoria';
-import Descargas from './pages/Descargas';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -63,25 +62,24 @@ function App() {
           <Route path="/" element={<Navigate to="/incidencias" replace />} />
           <Route path="/login" element={<Login />} />
           
-          {/* Dashboard: Solo Admin y TÃ©cnico (Usuarios regulares van directo a sus tickets) */}
-          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Administrador', 'TÃ©cnico']}><Dashboard /></ProtectedRoute>} />
+          {/* Dashboard: Solo Admin y Técnico (Usuarios regulares van directo a sus tickets) */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Administrador', 'Técnico']}><Dashboard /></ProtectedRoute>} />
           
           {/* Incidencias (Todos) */}
           <Route path="/incidencias" element={<ProtectedRoute><Incidencias /></ProtectedRoute>} />
           
-          {/* Mis Tickets (Solo TÃ©cnicos) */}
-          <Route path="/mis-tickets" element={<ProtectedRoute allowedRoles={['TÃ©cnico']}><Incidencias filterTecnico={true} /></ProtectedRoute>} />
+          {/* Mis Tickets (Solo Técnicos) */}
+          <Route path="/mis-tickets" element={<ProtectedRoute allowedRoles={['Técnico']}><Incidencias filterTecnico={true} /></ProtectedRoute>} />
           
-          {/* Detalle, Perfil y GuÃ­as (Todos) */}
+          {/* Detalle, Perfil y Guías (Todos) */}
           <Route path="/incidencia/:id" element={<ProtectedRoute><IncidentDetail /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/guias" element={<ProtectedRoute><Guias /></ProtectedRoute>} />
-          <Route path="/descargas" element={<ProtectedRoute><Descargas /></ProtectedRoute>} />
-          
+                    
           {/* Nueva (Solo Admin y Usuarios) */}
           <Route path="/nueva" element={<ProtectedRoute allowedRoles={['Administrador', 'Usuario']}><NewIncident /></ProtectedRoute>} />
           
-          {/* AdministraciÃ³n (Solo Admin) */}
+          {/* Administración (Solo Admin) */}
           <Route path="/usuarios" element={<ProtectedRoute allowedRoles={['Administrador']}><Usuarios /></ProtectedRoute>} />
           <Route path="/areas" element={<ProtectedRoute allowedRoles={['Administrador']}><Areas /></ProtectedRoute>} />
           <Route path="/auditoria" element={<ProtectedRoute allowedRoles={['Administrador']}><Auditoria /></ProtectedRoute>} />

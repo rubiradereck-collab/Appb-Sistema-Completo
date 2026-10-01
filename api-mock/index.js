@@ -8,25 +8,36 @@ const { getSqlServerDb, sql } = require("./db_sqlserver");
 
 const axios = require('axios');
 
-const enviarTelegram = async (chatId, text) => {
+const enviarTelegram = async (chatId, text, reply_markup = null) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !chatId) return;
+  if (!token || !chatId) return null;
   try {
-    await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
-      chat_id: chatId,
-      text: text
-    });
+    const payload = { chat_id: chatId, text: text };
+    if (reply_markup) payload.reply_markup = reply_markup;
+    const res = await require('axios').post(`https://api.telegram.org/bot${token}/sendMessage`, payload);
+    return res.data.result.message_id;
   } catch (err) {
     console.error('Error al enviar Telegram:', err.message);
+    return null;
   }
 };
 
-const notificarNuevaIncidencia = async (pool, incidencia) => {
+const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil") => {
   try {
     const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
-    const mensaje = `ðŸ†• Nueva Incidencia #${incidencia.IdIncidencia} (App Móvil)\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const reply_markup = { inline_keyboard: [[{ text: "Aceptar ticket", callback_data: `aceptar_${incidencia.IdIncidencia}` }]] };
     for (const t of tecnicos.recordset) {
-      await enviarTelegram(t.TelegramChatId, mensaje);
+      const messageId = await enviarTelegram(t.TelegramChatId, mensaje, reply_markup);
+      if (messageId) {
+         try {
+           await pool.request()
+              .input('IdIncidencia', require('mssql').Int, incidencia.IdIncidencia)
+              .input('ChatId', require('mssql').BigInt, t.TelegramChatId)
+              .input('MessageId', require('mssql').Int, messageId)
+              .query("INSERT INTO TelegramMensajes (IdIncidencia, ChatId, MessageId) VALUES (@IdIncidencia, @ChatId, @MessageId)");
+         } catch(dbErr) { console.error("DB Insert error TelegramMensajes", dbErr); }
+      }
     }
   } catch (err) {
     console.error('Error al notificar nueva incidencia', err);
@@ -56,6 +67,7 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
 const app = express();
 app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url);next();});
 app.use(cors());
+  app.use('/descargas', require('express').static(require('path').join(__dirname, 'public-descargas')));
 
 
 app.use(express.json({ limit: "10mb" }));
@@ -215,7 +227,7 @@ app.post('/api/interno/notificar', async (req, res) => {
     return res.status(403).json({ message: 'No autorizado' });
   }
   try {
-    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion } = req.body;
+    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen } = req.body;
     const pool = await getSqlServerDb();
 
     if (tipoEvento === 'nueva') {
@@ -225,7 +237,7 @@ app.post('/api/interno/notificar', async (req, res) => {
         TipoIncidencia: tipoIncidencia || 'N/A', 
         Descripcion: descripcion || '' 
       };
-      await notificarNuevaIncidencia(pool, mockIncidencia);
+      await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio');
     } else if (tipoEvento === 'asignar') {
       await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
     } else if (tipoEvento === 'estado') {
@@ -626,7 +638,7 @@ app.get("/api/incidencias/:id", async (req, res) => {
 
 app.post("/api/incidencias", async (req, res) => {
   try {
-    const { Descripcion, IdPrioridad, IdArea, Empleado, TipoIncidencia } = req.body;
+    const { Descripcion, IdPrioridad, IdArea, Empleado, TipoIncidencia, origen } = req.body;
     if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado inválido" });
     if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo inválido" });
     if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "Descripción muy corta" });
@@ -653,7 +665,7 @@ app.post("/api/incidencias", async (req, res) => {
     
     const newIn = await pool.request().input("IdIncidencia", sql.Int, newId).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     res.status(201).json(newIn.recordset[0]);
-      notificarNuevaIncidencia(pool, newIn.recordset[0]);
+      notificarNuevaIncidencia(pool, newIn.recordset[0], origen || 'App Móvil');
   } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
 });
 

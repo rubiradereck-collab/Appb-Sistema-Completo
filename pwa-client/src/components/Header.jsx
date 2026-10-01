@@ -106,8 +106,6 @@ const Header = () => {
               )}
               
               <NavLink to="/guias" icon={FiBook} label="Guías Rápidas" />
-              <NavLink to="/descargas" icon={FiDownload} label="Descargar App" />
-
               {user?.Rol === 'Administrador' && (
                 <>
                   <div className="mt-8 mb-3 px-4">

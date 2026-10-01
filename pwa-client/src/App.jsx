@@ -12,6 +12,7 @@ import Guias from './pages/Guias';
 import Usuarios from './pages/Usuarios';
 import Areas from './pages/Areas';
 import Auditoria from './pages/Auditoria';
+import Descargas from './pages/Descargas';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -75,6 +76,7 @@ function App() {
           <Route path="/incidencia/:id" element={<ProtectedRoute><IncidentDetail /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/guias" element={<ProtectedRoute><Guias /></ProtectedRoute>} />
+          <Route path="/descargas" element={<ProtectedRoute><Descargas /></ProtectedRoute>} />
           
           {/* Nueva (Solo Admin y Usuarios) */}
           <Route path="/nueva" element={<ProtectedRoute allowedRoles={['Administrador', 'Usuario']}><NewIncident /></ProtectedRoute>} />

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { FiMenu, FiX, FiLogOut, FiHome, FiList, FiPlusCircle, FiUser, FiBook, FiUsers, FiLayers, FiActivity, FiBell } from 'react-icons/fi';
+import { FiMenu, FiX, FiLogOut, FiHome, FiList, FiPlusCircle, FiUser, FiBook, FiDownload, FiUsers, FiLayers, FiActivity, FiBell } from 'react-icons/fi';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -106,6 +106,7 @@ const Header = () => {
               )}
               
               <NavLink to="/guias" icon={FiBook} label="Guías Rápidas" />
+              <NavLink to="/descargas" icon={FiDownload} label="Descargar App" />
 
               {user?.Rol === 'Administrador' && (
                 <>

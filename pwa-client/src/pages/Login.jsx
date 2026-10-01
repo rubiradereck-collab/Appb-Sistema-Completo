@@ -37,10 +37,10 @@ const Login = () => {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
-    const success = await login(username, password);
+    const result = await login(username, password);
     setLoading(false);
-    if (success) navigate('/');
-    else setErrorMsg('Credenciales incorrectas');
+    if (result.success) navigate('/');
+    else setErrorMsg(result.message);
   };
 
   return (

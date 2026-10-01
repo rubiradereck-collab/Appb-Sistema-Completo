@@ -76,7 +76,8 @@ const Guias = () => {
       setShowModal(false);
       fetchGuias();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al guardar'}));
+      const errorMsg = error.response?.data?.message || 'Error al guardar';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 
@@ -91,7 +92,8 @@ const Guias = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guía eliminada'}));
       fetchGuias();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al eliminar'}));
+      const errorMsg = error.response?.data?.message || 'Error al eliminar';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
     setConfirmModal({ show: false, id: null });
   };
@@ -120,7 +122,8 @@ const Guias = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guías enviadas por correo exitosamente'}));
       setEmailModal({ show: false, correoDestino: '' });
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error en la petición de correo'}));
+      const errorMsg = error.response?.data?.message || 'Error en la petición de correo';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 

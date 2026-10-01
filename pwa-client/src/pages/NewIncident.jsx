@@ -58,7 +58,8 @@ const NewIncident = () => {
         navigate('/incidencias');
       }, 6000);
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al crear la incidencia'}));
+      const errorMsg = error.response?.data?.message || 'Error al crear la incidencia';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
       setGuardando(false);
     }
   };

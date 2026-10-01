@@ -23,11 +23,13 @@ export const AuthProvider = ({ children }) => {
         setUser(res.data.user);
         localStorage.setItem('appb_user', JSON.stringify(res.data.user));
         localStorage.setItem('appb_token', res.data.token);
-        return true;
+        return { success: true };
       }
+      return { success: false, message: 'Credenciales incorrectas' };
     } catch (error) {
       console.error('Error logging in', error);
-      return false;
+      const msg = error.response?.data?.message || 'Servidor no disponible';
+      return { success: false, message: msg };
     }
   };
 

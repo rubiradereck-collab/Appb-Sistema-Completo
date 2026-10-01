@@ -52,7 +52,8 @@ const Areas = () => {
       setEditingId(null);
       fetchAreas();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al guardar área'}));
+      const errorMsg = error.response?.data?.message || 'Error al guardar área';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 
@@ -74,7 +75,8 @@ const Areas = () => {
           window.dispatchEvent(new CustomEvent('app-success', {detail: 'Área eliminada'}));
           fetchAreas();
         } catch (error) {
-          window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al eliminar área'}));
+          const errorMsg = error.response?.data?.message || 'Error al eliminar área';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
         }
       }
     });

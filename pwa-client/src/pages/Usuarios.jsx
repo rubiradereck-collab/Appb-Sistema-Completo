@@ -76,7 +76,8 @@ const Usuarios = () => {
       setFormData(initialForm);
       fetchUsuarios();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al guardar usuario'}));
+      const errorMsg = error.response?.data?.message || 'Error al guardar usuario';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 
@@ -92,7 +93,8 @@ const Usuarios = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Usuario eliminado'}));
       fetchUsuarios();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al eliminar usuario'}));
+      const errorMsg = error.response?.data?.message || 'Error al eliminar usuario';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
     setConfirmModal({ show: false, idUsuario: null });
   };
@@ -108,7 +110,8 @@ const Usuarios = () => {
       }));
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Contraseña temporal generada exitosamente.'}));
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al generar la contraseña.'}));
+      const errorMsg = error.response?.data?.message || 'Error al generar la contraseña.';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 

@@ -85,7 +85,8 @@ const Dashboard = () => {
   // Handlers para los botones de exportación (Placeholders)
   const handleExportPDF = () => {
     if (!incidencias || incidencias.length === 0) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos para exportar'}));
+      const errorMsg = error.response?.data?.message || 'No hay datos para exportar';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
       return;
     }
 
@@ -195,8 +196,9 @@ const Dashboard = () => {
         email: emailModal.email
       });
       window.dispatchEvent(new CustomEvent('app-success', {detail: res.data.message || 'Reporte enviado con éxito'}));
-    } catch(err) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al generar o enviar reporte mensual'}));
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Error al generar o enviar reporte mensual';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 
@@ -211,7 +213,8 @@ const Dashboard = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte Excel generado y descargado'}));
     } catch (err) {
       console.error(err);
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al generar Excel'}));
+      const errorMsg = err.response?.data?.message || 'Error al generar Excel';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
 

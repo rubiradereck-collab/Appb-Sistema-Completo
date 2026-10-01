@@ -109,49 +109,58 @@ app.get("/api/test-db", async (req, res) => {
 });
 
 app.post('/api/auth/recuperar-password', async (req, res) => {
-  try {
-    const { Correo } = req.body;
-    if (!Correo) return res.status(400).json({ message: 'Correo requerido' });
+    try {
+      const { Correo } = req.body;
+      if (!Correo) return res.status(400).json({ message: 'Correo requerido' });
+      
+      const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ message: 'Servicio de correo no configurado' });
 
-    const pool = await getSqlServerDb();
-    const userRes = await pool.request()
-      .input('Correo', sql.VarChar, Correo)
-      .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = 1');
-
-    if (userRes.recordset.length === 0) {
-      return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+      const pool = await getSqlServerDb();
+      const userRes = await pool.request()
+        .input('Correo', sql.VarChar, Correo)
+        .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = 1');
+  
+      if (userRes.recordset.length === 0) {
+        return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+      }
+  
+      const usuario = userRes.recordset[0];
+      const nuevaClave = Math.random().toString(36).slice(-8); 
+      const hash = await bcrypt.hash(nuevaClave, 10);
+      
+      // SEND EMAIL FIRST
+      try {
+        await transporter.sendMail({
+          from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
+          to: Correo,
+          subject: 'Recuperación de Contraseña - APPB',
+          html: `
+            <h3>Hola, ${usuario.Nombre}</h3>
+            <p>Has solicitado restablecer tu contraseña.</p>
+            <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
+            <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+            <br/>
+            <p>Atentamente,<br/>Equipo de Soporte APPB</p>
+          `
+        });
+      } catch (mailErr) {
+        console.error("Error enviando correo de recuperacion:", mailErr.message);
+        return res.status(500).json({ message: "No se pudo enviar el correo con la nueva contraseña. No se han guardado cambios." });
+      }
+  
+      // UPDATE ONLY IF MAIL SUCCEEDED
+      await pool.request()
+        .input('Id', sql.Int, usuario.IdUsuario)
+        .input('Hash', sql.VarChar, hash)
+        .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
+  
+      res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
-
-    const usuario = userRes.recordset[0];
-    const nuevaClave = Math.random().toString(36).slice(-8); 
-    const hash = await bcrypt.hash(nuevaClave, 10);
-
-    await pool.request()
-      .input('Id', sql.Int, usuario.IdUsuario)
-      .input('Hash', sql.VarChar, hash)
-      .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
-
-    const transporter = getTransporter();
-    await transporter.sendMail({
-      from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
-      to: Correo,
-      subject: 'Recuperación de Contraseña - APPB',
-      html: `
-        <h3>Hola, ${usuario.Nombre}</h3>
-        <p>Has solicitado restablecer tu contraseña.</p>
-        <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
-        <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
-        <br/>
-        <p>Atentamente,<br/>Equipo de Soporte APPB</p>
-      `
-    });
-
-    res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
-  } catch (err) {
-    console.error('Error recuperando password:', err);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
-});
+  });
 
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
@@ -357,6 +366,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
     
     try {
       const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
       await transporter.sendMail({
         from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
         to: correoDestino,
@@ -433,7 +443,8 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
     if (!email) return res.status(400).json({ error: "Falta el correo destino" });
     
     const transporter = getTransporter();
-    await transporter.sendMail({
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      await transporter.sendMail({
       from: `"Sistema APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
       to: email,
       subject: `Reporte Manual de Incidencias`,
@@ -498,7 +509,8 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
     if (userEmail) {
       try {
         const transporter = getTransporter();
-        await transporter.sendMail({
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      await transporter.sendMail({
           from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
           to: userEmail,
           subject: "Recuperación de contraseña - Sistema de Incidencias APPB",

@@ -233,7 +233,7 @@ const getCsharpPdfDefinition = (incidencias, tituloReporte) => {
 };
 
 export const exportToPDF = (data, tituloReporte, filename, returnBase64 = false) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const docDefinition = getCsharpPdfDefinition(data, tituloReporte);
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
@@ -254,15 +254,14 @@ export const exportToPDF = (data, tituloReporte, filename, returnBase64 = false)
           });
       } else {
         if (Capacitor.isNativePlatform()) {
-  pdfDocGenerator.getBase64(async (base64) => {
-    await saveNativeFile(base64, filename);
-  });
-} else {
-  pdfDocGenerator.download(filename);
-}
-
+        const base64 = await pdfDocGenerator.getBase64();
+        await saveNativeFile(base64, filename);
+        resolve();
+      } else {
+        pdfDocGenerator.download(filename);
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado y descargado'}));
         resolve();
+      }
       }
     } catch (error) {
       console.error(error);
@@ -415,7 +414,7 @@ const getCsharpGuiasPdfDefinition = (guias, tituloReporte) => {
 };
 
 export const exportGuiasPDF = (guias, tituloReporte, filename, returnBase64 = false) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const docDefinition = getCsharpGuiasPdfDefinition(guias, tituloReporte);
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
@@ -434,15 +433,14 @@ export const exportGuiasPDF = (guias, tituloReporte, filename, returnBase64 = fa
           .catch((err) => reject(err));
       } else {
         if (Capacitor.isNativePlatform()) {
-  pdfDocGenerator.getBase64(async (base64) => {
-    await saveNativeFile(base64, filename);
-  });
-} else {
-  pdfDocGenerator.download(filename);
-}
-
-        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Catálogo de Guías descargado'}));
+        const base64 = await pdfDocGenerator.getBase64();
+        await saveNativeFile(base64, filename);
         resolve();
+      } else {
+        pdfDocGenerator.download(filename);
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado y descargado'}));
+        resolve();
+      }
       }
     } catch (error) {
       console.error(error);
@@ -506,7 +504,7 @@ const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedo
 };
 
 export const exportGenericPDF = (data, columns, title, filename) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const tableHeader = columns.map(c => ({ text: c.header, style: 'tableHeader' }));
       const tableBody = data.map((item, index) => {
@@ -563,15 +561,14 @@ export const exportGenericPDF = (data, columns, title, filename) => {
 
       const pdfDocGenerator = pdfMake.createPdf(docDefinition);
       if (Capacitor.isNativePlatform()) {
-  pdfDocGenerator.getBase64(async (base64) => {
-    await saveNativeFile(base64, filename);
-  });
-} else {
-  pdfDocGenerator.download(filename);
-}
-
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado'}));
-      resolve();
+        const base64 = await pdfDocGenerator.getBase64();
+        await saveNativeFile(base64, filename);
+        resolve();
+      } else {
+        pdfDocGenerator.download(filename);
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF generado y descargado'}));
+        resolve();
+      }
     } catch (error) {
       reject(error);
     }

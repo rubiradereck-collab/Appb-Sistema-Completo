@@ -59,7 +59,8 @@ const Profile = () => {
           updateUser({ FotoPerfil: base64String });
           window.dispatchEvent(new CustomEvent('app-success', {detail: 'Foto actualizada exitosamente'}));
         } catch(err) {
-          window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al actualizar la foto'}));
+          const errorMsg = err.response?.data?.message || 'Error al actualizar la foto';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
         }
       };
       reader.readAsDataURL(file);
@@ -80,8 +81,9 @@ const Profile = () => {
           setPhotoPreview(null);
           updateUser({ FotoPerfil: null });
           window.dispatchEvent(new CustomEvent('app-success', {detail: 'Foto eliminada exitosamente'}));
-        } catch(err) {
-          window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al quitar foto'}));
+        } catch (err) {
+          const errorMsg = err.response?.data?.message || 'Error al quitar foto';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
         }
       }
     });

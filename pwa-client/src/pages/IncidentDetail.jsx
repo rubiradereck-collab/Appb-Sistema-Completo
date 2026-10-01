@@ -54,7 +54,8 @@ const IncidentDetail = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia actualizada'}));
       fetchDetail();
     } catch (error) {
-      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al actualizar'}));
+      const errorMsg = error.response?.data?.message || 'Error al actualizar';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
     setGuardando(false);
   };
@@ -76,7 +77,8 @@ const IncidentDetail = () => {
           window.dispatchEvent(new CustomEvent('app-success', {detail: 'Ticket asignado'}));
           fetchDetail();
         } catch (error) {
-          window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al asignar'}));
+          const errorMsg = error.response?.data?.message || 'Error al asignar';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
         }
         setGuardando(false);
       }
@@ -196,7 +198,8 @@ const IncidentDetail = () => {
                             window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia eliminada exitosamente.'}));
                             navigate('/incidencias');
                           } catch (error) {
-                            window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al eliminar incidencia.'}));
+                            const errorMsg = error.response?.data?.message || 'Error al eliminar incidencia.';
+      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
                           }
                         }
                       });

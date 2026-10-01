@@ -22,14 +22,20 @@ const enviarTelegram = async (chatId, text, reply_markup = null) => {
   }
 };
 
-const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil") => {
+const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil", idTecnicoAsignado = null) => {
   try {
-    const tecnicos = await pool.request().query("SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL");
+    let query = "SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL";
+    const req = pool.request();
+    if (idTecnicoAsignado) {
+       query += " AND IdUsuario = @IdTecnico";
+       req.input('IdTecnico', require('mssql').Int, idTecnicoAsignado);
+    }
+    const tecnicos = await req.query(query);
     const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
-    const reply_markup = { inline_keyboard: [[{ text: "Aceptar ticket", callback_data: `aceptar_${incidencia.IdIncidencia}` }]] };
+    const reply_markup = idTecnicoAsignado ? null : { inline_keyboard: [[{ text: "Aceptar ticket", callback_data: `aceptar_${incidencia.IdIncidencia}` }]] };
     for (const t of tecnicos.recordset) {
       const messageId = await enviarTelegram(t.TelegramChatId, mensaje, reply_markup);
-      if (messageId) {
+      if (messageId && !idTecnicoAsignado) {
          try {
            await pool.request()
               .input('IdIncidencia', require('mssql').Int, incidencia.IdIncidencia)
@@ -237,7 +243,7 @@ app.post('/api/interno/notificar', async (req, res) => {
         TipoIncidencia: tipoIncidencia || 'N/A', 
         Descripcion: descripcion || '' 
       };
-      await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio');
+      await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio', idTecnicoAsignado);
     } else if (tipoEvento === 'asignar') {
       await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
     } else if (tipoEvento === 'estado') {

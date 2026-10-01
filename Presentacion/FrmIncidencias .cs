@@ -302,7 +302,11 @@ namespace Presentacion
                     
                     string json = System.Text.Json.JsonSerializer.Serialize(payload);
                     var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                    _ = client.PostAsync($"{apiUrl}/api/interno/notificar", content);
+                    var resp = await client.PostAsync($"{apiUrl}/api/interno/notificar", content);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"Error HTTP al notificar: {resp.StatusCode}");
+                    }
                 }
             }
             catch (Exception ex)

@@ -71,7 +71,7 @@ const NewIncident = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 pb-10">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 pb-28 md:pb-10">
       <Header />
       <main className="p-4 max-w-3xl mx-auto w-full">
         <button onClick={() => navigate(-1)} className="flex items-center text-blue-600 mb-4 py-2 font-medium">

@@ -63,7 +63,7 @@ export const PriorityChip = ({ priority, idPrioridad }) => {
 
 export const IncidentCard = ({ incidencia }) => {
   return (
-    <Link to={`/incidencia/${incidencia.NumeroTicket}`} className="block">
+    <Link to={`/incidencia/${incidencia.IdIncidencia}`} className="block">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md transition-all p-4 relative">
         
         {incidencia.EscaladoSLA && (
@@ -74,7 +74,7 @@ export const IncidentCard = ({ incidencia }) => {
         )}
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold text-gray-400 dark:text-gray-500">#{incidencia.IdIncidencia}</span>
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500">{incidencia.NumeroTicket}</span>
             <StatusChip status={incidencia.NombreEstado} idEstado={incidencia.IdEstado} />
             <PriorityChip priority={incidencia.NombrePrioridad} idPrioridad={incidencia.IdPrioridad} />
           </div>

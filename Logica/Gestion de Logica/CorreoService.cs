@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 ﻿using System;
 using System.Configuration;
 using System.IO;
@@ -77,6 +78,47 @@ namespace Logica.Gestion_de_Logica
                 }
             }
         }
+
+        public static void EnviarCorreoConAdjuntos(string destinatario, string asunto, string cuerpo, List<Tuple<byte[], string>> adjuntos)
+        {
+            string servidor = ConfigurationManager.AppSettings["SmtpServidor"];
+            int puerto = int.Parse(ConfigurationManager.AppSettings["SmtpPuerto"] ?? "587");
+            string usuario = ConfigurationManager.AppSettings["SmtpUsuario"];
+            string password = ConfigurationManager.AppSettings["SmtpPassword"];
+            bool usarSsl = bool.Parse(ConfigurationManager.AppSettings["SmtpUsarSsl"] ?? "true");
+
+            ConfigurarValidacionCertificado(servidor);
+
+            using (MailMessage mensaje = new MailMessage())
+            {
+                mensaje.From = new MailAddress(usuario, "Sistema de Incidencias APPB");
+                mensaje.To.Add(destinatario);
+                mensaje.Subject = asunto;
+                mensaje.Body = cuerpo;
+
+                List<MemoryStream> streams = new List<MemoryStream>();
+                if (adjuntos != null)
+                {
+                    foreach (var adj in adjuntos)
+                    {
+                        var ms = new MemoryStream(adj.Item1);
+                        streams.Add(ms);
+                        mensaje.Attachments.Add(new Attachment(ms, adj.Item2));
+                    }
+                }
+
+                using (SmtpClient cliente = new SmtpClient(servidor, puerto))
+                {
+                    cliente.EnableSsl = usarSsl;
+                    cliente.Credentials = new NetworkCredential(usuario, password);
+                    cliente.Send(mensaje);
+                }
+
+                foreach (var ms in streams)
+                {
+                    ms.Dispose();
+                }
+            }
+        }
     }
 }
-

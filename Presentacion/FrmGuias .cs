@@ -333,31 +333,41 @@ namespace Presentacion
                 }
             };
         }
-        private void btnEnviarCorreo_Click(object sender, EventArgs e)
+        private async void btnEnviarCorreo_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtCorreoDestino.Text) || txtCorreoDestino.Text == "correo@ejemplo.com")
-            {
-                MessageBox.Show("Ingresa un correo de destino.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            var frmEnvio = new FrmEnviarCorreo("", "Guías de Ayuda - Sistema de Incidencias APPB", false);
+            frmEnvio.ShowDialog();
+
+            if (!frmEnvio.ConfirmaEnvio) return;
+
+            btnEnviarCorreo.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
 
             try
             {
-                byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(listaGuias);
+                string correoDestino = frmEnvio.CorreoDestino;
+                string asunto = frmEnvio.Asunto;
+                string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrarás el catálogo de guías rápidas de solución a problemas frecuentes." : frmEnvio.Mensaje;
 
-                CorreoService.EnviarCorreoConAdjunto(
-                    txtCorreoDestino.Text.Trim(),
-                    "Guías de Ayuda - Sistema de Incidencias APPB",
-                    "Adjunto encontrarás el catálogo de guías rápidas de solución a problemas frecuentes.",
-                    pdf,
-                    "GuiasDeAyuda.pdf"
-                );
+                await Task.Run(() =>
+                {
+                    byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(listaGuias);
+                    var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
+                    adjuntos.Add(new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf"));
+
+                    CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                });
 
                 MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"No se pudo enviar el correo:\n\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnEnviarCorreo.Enabled = true;
+                this.Cursor = Cursors.Default;
             }
         }
     }

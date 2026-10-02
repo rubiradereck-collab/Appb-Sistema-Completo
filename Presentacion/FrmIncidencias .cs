@@ -542,7 +542,92 @@ namespace Presentacion
                 e.Handled = true;
             }
         }
-    }
+    
+        private async void btnEnviarCorreo_Click(object sender, EventArgs e)
+        {
+            var frmOpciones = new Form();
+            frmOpciones.Text = "Opciones de Envío";
+            frmOpciones.Size = new System.Drawing.Size(350, 150);
+            frmOpciones.StartPosition = FormStartPosition.CenterParent;
+            frmOpciones.FormBorderStyle = FormBorderStyle.FixedDialog;
+            frmOpciones.MaximizeBox = false;
+            frmOpciones.MinimizeBox = false;
+
+            var lbl = new Label() { Text = "¿Qué información deseas enviar?", Location = new System.Drawing.Point(20, 20), AutoSize = true };
+            var btnListado = new Button() { Text = "Listado Actual", Location = new System.Drawing.Point(20, 60), Size = new System.Drawing.Size(130, 30) };
+            var btnDetalle = new Button() { Text = "Incidencia Seleccionada", Location = new System.Drawing.Point(170, 60), Size = new System.Drawing.Size(150, 30) };
+            
+            if (incidenciaSeleccionada == null) btnDetalle.Enabled = false;
+
+            int opcion = 0; // 1 = Listado, 2 = Detalle
+            btnListado.Click += (s, ev) => { opcion = 1; frmOpciones.Close(); };
+            btnDetalle.Click += (s, ev) => { opcion = 2; frmOpciones.Close(); };
+
+            frmOpciones.Controls.Add(lbl);
+            frmOpciones.Controls.Add(btnListado);
+            frmOpciones.Controls.Add(btnDetalle);
+            Presentacion.Estilos.TemaModerno.Aplicar(frmOpciones);
+            frmOpciones.ShowDialog();
+
+            if (opcion == 0) return;
+
+            var frmEnvio = new FrmEnviarCorreo(usuarioActual.Correo, opcion == 1 ? "Reporte de Incidencias" : $"Detalle Incidencia #{incidenciaSeleccionada.IdIncidencia}", opcion == 1);
+            frmEnvio.ShowDialog();
+
+            if (!frmEnvio.ConfirmaEnvio) return;
+
+            btnEnviarCorreo.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+
+            try
+            {
+                string correoDestino = frmEnvio.CorreoDestino;
+                string asunto = frmEnvio.Asunto;
+                string mensaje = frmEnvio.Mensaje;
+                bool adjuntarExcel = frmEnvio.AdjuntarExcel;
+                var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
+
+                await Task.Run(() =>
+                {
+                    if (opcion == 1)
+                    {
+                        byte[] pdf = IncidenciaReportes.GenerarPdfListado(listaIncidencias);
+                        adjuntos.Add(new Tuple<byte[], string>(pdf, "ListadoIncidencias.pdf"));
+                        if (adjuntarExcel)
+                        {
+                            byte[] excel = IncidenciaReportes.GenerarExcelListado(listaIncidencias);
+                            adjuntos.Add(new Tuple<byte[], string>(excel, "ListadoIncidencias.xlsx"));
+                        }
+                    }
+                    else
+                    {
+                        byte[] pdf = IncidenciaReportes.GenerarPdfDetalleIncidencia(incidenciaSeleccionada);
+                        adjuntos.Add(new Tuple<byte[], string>(pdf, $"Incidencia_{incidenciaSeleccionada.IdIncidencia}.pdf"));
+                    }
+
+                    CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    
+                    AuditoriaService.RegistrarAccion(
+                        usuarioActual.IdUsuario,
+                        "Enviar correo",
+                        "Incidencia",
+                        $"Destinatario: {correoDestino}, Archivos: {adjuntos.Count}"
+                    );
+                });
+
+                MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al enviar el correo:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnEnviarCorreo.Enabled = true;
+                this.Cursor = Cursors.Default;
+            }
+        }
+}
 }
 
 

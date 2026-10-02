@@ -3,12 +3,35 @@ using System.Configuration;
 using System.IO;
 using System.Net;
 using System.Net.Mail;
-
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Logica.Gestion_de_Logica
 {
     public static class CorreoService
     {
+        private static void ConfigurarValidacionCertificado(string servidor)
+        {
+            bool ignorarCertificadoVencido = false;
+            bool.TryParse(ConfigurationManager.AppSettings["SmtpIgnorarCertificadoVencido"], out ignorarCertificadoVencido);
+
+            if (ignorarCertificadoVencido)
+            {
+                ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) =>
+                {
+                    if (sslPolicyErrors == SslPolicyErrors.None)
+                        return true;
+
+                    if (sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors)
+                    {
+                        if (certificate.Subject.Contains(servidor))
+                            return true;
+                    }
+                    return false;
+                };
+            }
+        }
+
         public static void EnviarCorreo(string destinatario, string asunto, string cuerpo)
         {
             string servidor = ConfigurationManager.AppSettings["SmtpServidor"];
@@ -16,6 +39,8 @@ namespace Logica.Gestion_de_Logica
             string usuario = ConfigurationManager.AppSettings["SmtpUsuario"];
             string password = ConfigurationManager.AppSettings["SmtpPassword"];
             bool usarSsl = bool.Parse(ConfigurationManager.AppSettings["SmtpUsarSsl"] ?? "true");
+
+            ConfigurarValidacionCertificado(servidor);
 
             using (MailMessage mensaje = new MailMessage())
             {
@@ -40,6 +65,8 @@ namespace Logica.Gestion_de_Logica
             string usuario = ConfigurationManager.AppSettings["SmtpUsuario"];
             string password = ConfigurationManager.AppSettings["SmtpPassword"];
             bool usarSsl = bool.Parse(ConfigurationManager.AppSettings["SmtpUsarSsl"] ?? "true");
+
+            ConfigurarValidacionCertificado(servidor);
 
             using (MailMessage mensaje = new MailMessage())
             using (var ms = new MemoryStream(adjunto))

@@ -189,7 +189,8 @@ app.post("/api/auth/login", async (req, res) => {
     }
     
     if (user.BloqueadoHasta && new Date(user.BloqueadoHasta) > new Date()) {
-      return res.status(401).json({ success: false, message: "Cuenta bloqueada temporalmente" });
+      const faltan = Math.ceil((new Date(user.BloqueadoHasta) - new Date()) / 60000);
+        return res.status(401).json({ success: false, message: "Cuenta bloqueada. Intenta de nuevo en " + faltan + " minuto(s)." });
     }
 
     const match = await bcrypt.compare(password, user.Password);
@@ -242,7 +243,7 @@ const verifyToken = (req, res, next) => {
   if (!token) return res.status(401).json({ message: "Token requerido" });
 
   jwt.verify(token, process.env.JWT_SECRET || "super_secret_key_12345", (err, decoded) => {
-    if (err) return res.status(403).json({ message: "Token invlido o expirado" });
+    if (err) return res.status(401).json({ message: "Token inválido o expirado" });
     req.user = decoded;
     next();
   });

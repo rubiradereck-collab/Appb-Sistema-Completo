@@ -7,6 +7,7 @@
 		<add key="SmtpUsuario" value="soporte.tickets@appb.gob.ec" />
 		<add key="SmtpPassword" value="TU_NUEVO_PASSWORD_CORREO" />
 		<add key="SmtpUsarSsl" value="true" />
+		<add key="SmtpIgnorarCertificadoVencido" value="false" />
 	</appSettings>
 	<connectionStrings>
 		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2"
@@ -68,3 +69,4 @@
 <!-- Agrega estas claves a tu App.config real: -->
 <!-- <add key="NodeApiUrl" value="http://131.150.25.22:3001" /> -->
 <!-- <add key="InternalApiKey" value="PONER_API_KEY_AQUI" /> -->
+

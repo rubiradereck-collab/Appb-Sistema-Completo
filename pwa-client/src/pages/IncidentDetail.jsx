@@ -5,6 +5,8 @@ import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../AuthContext';
 import Header from '../components/Header';
+import { CardSkeleton } from '../components/Skeletons';
+import { StatusChip, PriorityChip } from '../components/IncidentCard';
 import { FiArrowLeft, FiClock, FiUser, FiInfo } from 'react-icons/fi';
 
 const IncidentDetail = () => {

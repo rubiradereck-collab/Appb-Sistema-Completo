@@ -2,6 +2,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import api from '../api';
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import Header from '../components/Header';
 import { FiArrowLeft, FiSave, FiCheckCircle } from 'react-icons/fi';
 

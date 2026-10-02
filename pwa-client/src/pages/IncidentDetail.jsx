@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../AuthContext';
 import Header from '../components/Header';
 import { FiArrowLeft, FiClock, FiUser, FiInfo } from 'react-icons/fi';

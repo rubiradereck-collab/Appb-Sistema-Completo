@@ -1,3 +1,5 @@
+import { NetworkStatus } from './components/NetworkStatus';
+import { BackButtonHandler } from './components/BackButtonHandler';
 ﻿import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -57,7 +59,9 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <ToastMessage />
+        <NetworkStatus />
+          <BackButtonHandler />
+          <ToastMessage />
         <Routes>
           <Route path="/" element={<Navigate to="/incidencias" replace />} />
           <Route path="/login" element={<Login />} />

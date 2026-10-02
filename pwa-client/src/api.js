@@ -23,6 +23,10 @@ api.interceptors.response.use(
   (error) => {
     // Si no hay respuesta del servidor (caído o sin internet)
     if (!error.response) {
+      
+      if (error.config && error.config.silent) {
+        return Promise.reject(error);
+      }
       window.dispatchEvent(new CustomEvent('app-error', { detail: 'Error de conexión: Por favor, revisa tu conexión a internet o intenta más tarde.' }));
       return Promise.reject(error);
     }

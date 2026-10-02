@@ -58,14 +58,10 @@ const ToastMessage = () => {
 };
 
 function App() {
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      StatusBar.setBackgroundColor({ color: '#162d47' });
-      StatusBar.setStyle({ style: Style.Dark });
-    }
-  }, []);
+
   return (
-    <AuthProvider>
+    <SettingsProvider>
+      <AuthProvider>
       <Router>
         <NetworkStatus />
           <BackButtonHandler />
@@ -82,6 +78,7 @@ function App() {
           
           {/* Mis Tickets (Solo Técnicos) */}
           <Route path="/mis-tickets" element={<ProtectedRoute allowedRoles={['Técnico']}><Incidencias filterTecnico={true} /></ProtectedRoute>} />
+            <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
           
           {/* Detalle, Perfil y Guías (Todos) */}
           <Route path="/incidencia/:id" element={<ProtectedRoute><IncidentDetail /></ProtectedRoute>} />
@@ -98,6 +95,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+      </SettingsProvider>
   );
 }
 

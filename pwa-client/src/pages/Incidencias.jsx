@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import Header from '../components/Header';

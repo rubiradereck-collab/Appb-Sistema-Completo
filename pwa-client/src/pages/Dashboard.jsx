@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import Header from '../components/Header';
@@ -373,11 +374,11 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="85%">
                 {activeTab === 'tendencia' ? (
                   <LineChart data={dataTendencia} margin={{ top: 20, right: 30, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} dy={10} />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#4b5563' }} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Line type="monotone" dataKey="tickets" stroke="#2988c9" strokeWidth={3} dot={{ r: 4, fill: '#2988c9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === "dark" ? "#374151" : "#e5e7eb"} />
+                    <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: theme === 'dark' ? '#9ca3af' : '#6b7280' }} dy={10} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: theme === 'dark' ? '#d1d5db' : '#4b5563' }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#ffffff' : '#000000' }} />
+                  <Line type="monotone" dataKey="tickets" stroke="#2988c9" strokeWidth={3} dot={{ r: 4, fill: "#2988c9", strokeWidth: 2, stroke: theme === "dark" ? "#1f2937" : "#fff" }} activeDot={{ r: 6 }} />
                 </LineChart>
               ) : (
                 <PieChart>
@@ -395,8 +396,8 @@ const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }} />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#4b5563' }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#ffffff' : '#000000' }} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: theme === 'dark' ? '#d1d5db' : '#4b5563' }} />
                 </PieChart>
               )}
             </ResponsiveContainer>

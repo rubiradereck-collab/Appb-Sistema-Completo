@@ -1,13 +1,23 @@
 ﻿{
     "appId":  "com.appb.tecnicos",
     "webDir":  "dist",
-    "appName":  "APPB",
+    "appName":  "APPB Incidencias",
     "server":  {
                    "cleartext":  true
                },
     "plugins":  {
                     "CapacitorHttp":  {
                                           "enabled":  true
-                                      }
+                                      },
+                    "SplashScreen":  {
+                                         "splashFullScreen":  true,
+                                         "launchShowDuration":  1500,
+                                         "showSpinner":  false,
+                                         "splashImmersive":  true,
+                                         "fadeOutDuration":  500,
+                                         "launchAutoHide":  false,
+                                         "backgroundColor":  "#162d47",
+                                         "androidSplashResourceName":  "splash"
+                                     }
                 }
 }

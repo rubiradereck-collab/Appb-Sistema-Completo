@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from './api';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { Capacitor } from '@capacitor/core';
 
 const AuthContext = createContext();
 
@@ -14,6 +16,9 @@ export const AuthProvider = ({ children }) => {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
+    if (Capacitor.isNativePlatform()) {
+      SplashScreen.hide();
+    }
   }, []);
 
   const login = async (username, password) => {

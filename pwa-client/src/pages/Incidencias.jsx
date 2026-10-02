@@ -1,26 +1,33 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import Header from '../components/Header';
-import { FiPlus, FiFilter, FiSearch, FiDownload, FiAlertCircle } from 'react-icons/fi';
-import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { IncidentCard } from '../components/IncidentCard';
+import { CardSkeleton, EmptyState } from '../components/Skeletons';
+import { FiFilter, FiSearch, FiDownload, FiCheck, FiX, FiInbox, FiChevronDown, FiFileText, FiGrid } from 'react-icons/fi';
+import { exportGenericExcel, exportGenericPDF } from '../utils/exportUtils';
 
 const Incidencias = ({ filterTecnico = false }) => {
   const { user } = useAuth();
   const { autoRefresh, refreshInterval } = useSettings();
   const [incidencias, setIncidencias] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [estados, setEstados] = useState([]);
   
   // Filtros
-  const [estadoFiltro, setEstadoFiltro] = useState('');
-  const [search, setSearch] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [ordenFecha, setOrdenFecha] = useState('desc');
+
+  // UI state
+  const [showFilters, setShowFilters] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -29,219 +36,187 @@ const Incidencias = ({ filterTecnico = false }) => {
   useAutoRefresh(() => fetchData(true), autoRefresh ? refreshInterval : null);
 
   const fetchData = async (isAutoRefresh = false) => {
-    if (!isAutoRefresh) setLoading(true);
+    if (!isAutoRefresh && incidencias.length === 0) setLoading(true);
     try {
       const [incRes, estRes] = await Promise.all([
-        api.get('/incidencias', isAutoRefresh ? { silent: true } : {}), // El backend real trae todo, filtramos en el cliente
+        api.get('/incidencias', isAutoRefresh ? { silent: true } : {}),
         api.get('/estados', isAutoRefresh ? { silent: true } : {})
       ]);
       setIncidencias(incRes.data);
       setEstados(estRes.data);
     } catch (error) {
-      console.error('Error fetching data', error);
-    }
-    if (!isAutoRefresh) setLoading(false);
-  };
-
-  const getPriorityColor = (id) => {
-    switch (id) {
-      case 1: return 'bg-red-100 text-red-800 border-red-200'; // Alta
-      case 2: return 'bg-orange-100 text-orange-800 border-orange-200'; // Media
-      default: return 'bg-green-100 text-green-800 border-green-200'; // Baja
+      if (!isAutoRefresh) window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al cargar incidencias'}));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getStatusColor = (id) => {
-    switch (id) {
-      case 1: return 'bg-orange-400 text-white'; // Pendiente (naranja)
-      case 2: return 'bg-blue-400 text-white'; // En Proceso
-      case 3: return 'bg-green-500 text-white'; // Resuelto
-      case 4: return 'bg-gray-500 text-white'; // Cerrado
-      default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
+
+  // Pull to refresh logic for mobile (simple native scroll detection or just use standard touch events)
+  // Capacitor handles native pull to refresh if configured, or we can build a simple one. 
+  // Given time constraints, a simple reload button/indicator at top or native pull is best.
+
+  const incidenciasFiltradas = incidencias
+    .filter(i => filterTecnico ? i.IdTecnico === user.IdUsuario : true)
+    .filter(i => i.Asunto.toLowerCase().includes(busqueda.toLowerCase()) || i.IdIncidencia.toString().includes(busqueda))
+    .filter(i => filtroEstado === '' || i.IdEstado.toString() === filtroEstado)
+    .filter(i => {
+      if (!fechaDesde && !fechaHasta) return true;
+      const f = new Date(i.FechaCreacion).getTime();
+      const d = fechaDesde ? new Date(fechaDesde).getTime() : 0;
+      const h = fechaHasta ? new Date(fechaHasta).getTime() + 86400000 : Infinity;
+      return f >= d && f <= h;
+    })
+    .sort((a, b) => {
+      const da = new Date(a.FechaCreacion).getTime();
+      const db = new Date(b.FechaCreacion).getTime();
+      return ordenFecha === 'asc' ? da - db : db - da;
+    });
+
+  const activeFiltersCount = (filtroEstado !== '' ? 1 : 0) + (fechaDesde !== '' ? 1 : 0) + (fechaHasta !== '' ? 1 : 0);
+
+  const handleExportPDF = async () => {
+    setShowExport(false);
+    if (incidenciasFiltradas.length === 0) return window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos'}));
+    try {
+      await exportGenericPDF(incidenciasFiltradas, 'Reporte de Incidencias', `Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch(err) {
+      window.dispatchEvent(new CustomEvent('app-error', {detail: err.message || 'Error al exportar'}));
     }
   };
 
-  const getStatusName = (id) => {
-    const st = estados.find(e => e.IdEstado === id);
-    return st ? st.NombreEstado : 'Desconocido';
+  const handleExportExcel = async () => {
+    setShowExport(false);
+    if (incidenciasFiltradas.length === 0) return window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos'}));
+    try {
+      await exportGenericExcel(incidenciasFiltradas, `Incidencias_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch(err) {
+      window.dispatchEvent(new CustomEvent('app-error', {detail: err.message || 'Error al exportar'}));
+    }
   };
 
-  let filteredIncidencias = incidencias.filter(i => {
-    // 1. Búsqueda por texto
-    const s = search.toLowerCase();
-    const matchesSearch = !s || (
-      (i.NumeroTicket && i.NumeroTicket.toLowerCase().includes(s)) ||
-      (i.Empleado && i.Empleado.toLowerCase().includes(s)) ||
-      (i.Descripcion && i.Descripcion.toLowerCase().includes(s))
-    );
-
-    // 2. Filtro de estado
-    const matchesEstado = !estadoFiltro || i.IdEstado === parseInt(estadoFiltro);
-
-    // 3. Filtros de rol de usuario o técnico
-    const isTecnicoMatched = !filterTecnico || i.IdTecnicoAsignado === user.IdUsuario;
-    const isUsuarioMatched = user?.Rol !== 'Usuario' || (i.Empleado || '').toLowerCase() === `${user.Nombre} ${user.Apellido}`.trim().toLowerCase();
-
-    // 4. Filtro por Fechas
-    const incDate = new Date(i.Fecha).getTime();
-    const fromDate = fechaDesde ? new Date(fechaDesde).getTime() : 0;
-    // Hasta se ajusta al final del día
-    const toDate = fechaHasta ? new Date(fechaHasta).setHours(23, 59, 59, 999) : Infinity;
-    const matchesDate = incDate >= fromDate && incDate <= toDate;
-
-    return matchesSearch && matchesEstado && isTecnicoMatched && isUsuarioMatched && matchesDate;
-  });
-
-  // Ordenar
-  filteredIncidencias.sort((a, b) => {
-    const d1 = new Date(a.Fecha).getTime();
-    const d2 = new Date(b.Fecha).getTime();
-    return ordenFecha === 'desc' ? d2 - d1 : d1 - d2;
-  });
+  const clearFilters = () => {
+    setFiltroEstado(''); setFechaDesde(''); setFechaHasta(''); setOrdenFecha('desc'); setBusqueda(''); setShowFilters(false);
+  };
 
   return (
-    <div className="flex flex-col h-full relative pb-20 bg-brand-light">
-      <Header />
-      
-      <main className="flex-1 p-4 lg:p-8 max-w-5xl mx-auto w-full">
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 mt-2">
-          <div>
-            <h2 className="text-2xl font-black text-brand-dark tracking-tight">
-              {filterTecnico ? 'Mis Tickets Asignados' : (user?.Rol === 'Usuario' ? 'Mis Reportes de Incidencias' : 'Gestión de Incidencias')}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {filterTecnico ? 'Tickets que debes resolver' : 'Lista completa de requerimientos y reportes'}
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <button onClick={() => exportToPDF(
-                filteredIncidencias, 
-                'Reporte de Incidencias', 
-                `Reporte_Incidencias_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.pdf`
-              )}
-              className="bg-red-50 text-red-600 hover:bg-red-100 p-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors" title="Exportar a PDF">
-              <FiDownload className="text-lg" />
-            </button>
-            <button onClick={() => exportToExcel(
-                filteredIncidencias, 
-                `Reporte_Incidencias_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.xlsx`
-              )}
-              className="bg-green-50 text-green-600 hover:bg-green-100 p-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors" title="Exportar a Excel">
-              <FiDownload className="text-lg" />
-            </button>
+    <div className="min-h-screen bg-brand-light dark:bg-gray-900 pb-20">
+      <Header title={filterTecnico ? "Mis Tickets" : "Incidencias"} />
 
-            <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-1.5 focus-within:ring-2 ring-brand-blue transition-all">
-              <FiFilter className="text-gray-400 ml-2" />
-              <select 
-                className="bg-transparent border-none text-sm outline-none py-1 pl-2 pr-4 text-gray-700 dark:text-gray-300 font-bold"
-                value={estadoFiltro}
-                onChange={(e) => setEstadoFiltro(e.target.value)}
-              >
-                <option value="">Todos los Estados</option>
-                {estados.map(e => (
-                  <option key={e.IdEstado} value={e.IdEstado}>{e.NombreEstado}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros y Búsqueda */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8 space-y-4">
-          <div className="relative">
-            <FiSearch className="absolute left-4 top-3.5 text-gray-400 text-xl" />
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
+        {/* Top Bar: Search and Buttons */}
+        <div className="flex space-x-2 mb-4">
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Buscar por ticket, empleado o descripción..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-modern pl-12 text-lg shadow-none border-gray-200 dark:border-gray-700 w-full"
+              placeholder="Buscar ticket..." 
+              value={busqueda} 
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none dark:text-white"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Desde</label>
-              <input 
-                type="date" 
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Hasta</label>
-              <input 
-                type="date" 
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Ordenar por</label>
-              <select 
-                value={ordenFecha}
-                onChange={(e) => setOrdenFecha(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 font-bold focus:ring-2 focus:ring-brand-blue outline-none"
-              >
-                <option value="desc">Más recientes primero</option>
-                <option value="asc">Más antiguos primero</option>
-              </select>
-            </div>
+          
+          <button onClick={() => setShowFilters(true)} className="relative flex items-center justify-center p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 active:scale-95 transition-all">
+            <FiFilter size={18} />
+            {activeFiltersCount > 0 && <span className="absolute -top-1 -right-1 bg-brand-blue text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{activeFiltersCount}</span>}
+          </button>
+
+          <div className="relative">
+            <button onClick={() => setShowExport(!showExport)} className="flex items-center justify-center p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 active:scale-95 transition-all">
+              <FiDownload size={18} />
+            </button>
+            {showExport && (
+              <div className="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 overflow-hidden">
+                <button onClick={handleExportPDF} className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"><FiFileText className="mr-2 text-red-500" /> PDF</button>
+                <button onClick={handleExportExcel} className="w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"><FiGrid className="mr-2 text-green-500" /> Excel</button>
+              </div>
+            )}
           </div>
         </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-400 font-bold animate-pulse">Cargando incidencias...</div>
-        ) : filteredIncidencias.length === 0 ? (
-          <div className="card-modern p-12 text-center border-dashed border-2 border-gray-200 dark:border-gray-700 shadow-none">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiSearch className="text-gray-400 text-2xl" />
-            </div>
-            <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">No se encontraron incidencias.</p>
-            <p className="text-gray-400 text-sm mt-1">Prueba cambiando los filtros de búsqueda.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredIncidencias.map(inc => (
-              <Link to={`/incidencia/${inc.IdIncidencia}`} key={inc.IdIncidencia} className="card-modern p-5 border-l-4 hover:shadow-lg transition-all hover:-translate-y-1 group" style={{ borderLeftColor: inc.IdPrioridad === 1 ? '#ef4444' : inc.IdPrioridad === 2 ? '#f59e0b' : '#3b82f6' }}>
-                <div className="flex justify-between items-start mb-3">
-                  <span className="font-black text-brand-dark group-hover:text-brand-blue transition-colors">{inc.NumeroTicket}</span>
-                  <span className="text-xs font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">{new Date(inc.Fecha).toLocaleDateString()}</span>
-                </div>
-                <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2 line-clamp-1">{inc.TipoIncidencia}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 leading-relaxed">{inc.Descripcion}</p>
-                
-                <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-50">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getPriorityColor(inc.IdPrioridad)}`}>
-                      {inc.IdPrioridad === 1 ? 'Alta' : inc.IdPrioridad === 2 ? 'Media' : 'Baja'}
-                    </span>
-                    {inc.vencida && (
-                      <span className="text-[10px] font-bold px-2.5 py-1 bg-red-100 text-red-600 rounded-full flex items-center gap-1 uppercase tracking-wider">
-                        <FiAlertCircle /> SLA Vencido
-                      </span>
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full shadow-sm uppercase tracking-wider border ${getStatusColor(inc.IdEstado)}`}>
-                    {getStatusName(inc.IdEstado)}
-                  </span>
-                </div>
-              </Link>
-            ))}
+        {/* Pull to refresh native indicator / Button */}
+        {refreshing && (
+          <div className="flex justify-center py-2 mb-2">
+            <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
-      </main>
 
-      {(user?.Rol === 'Administrador' || user?.Rol === 'Usuario') && (
-        <Link 
-          to="/nueva" 
-          className="fixed bottom-6 right-6 w-14 h-14 bg-brand-blue text-white rounded-full flex items-center justify-center shadow-lg hover:bg-brand-hover hover:scale-105 transition-all"
-        >
-          <FiPlus size={28} />
-        </Link>
+        {/* List */}
+        <div className="space-y-3" onTouchStart={(e) => {
+          // Simplest pull to refresh trigger without complex library
+          if (window.scrollY === 0) window.pullStartY = e.touches[0].clientY;
+        }} onTouchEnd={(e) => {
+          if (window.scrollY === 0 && window.pullStartY && (e.changedTouches[0].clientY - window.pullStartY > 80)) {
+            handleRefresh();
+          }
+          window.pullStartY = null;
+        }}>
+          {loading ? (
+            Array(5).fill(0).map((_, i) => <CardSkeleton key={i} />)
+          ) : incidenciasFiltradas.length > 0 ? (
+            incidenciasFiltradas.map(incidencia => (
+              <IncidentCard key={incidencia.IdIncidencia} incidencia={incidencia} />
+            ))
+          ) : (
+            <EmptyState 
+              title={activeFiltersCount > 0 || busqueda ? "Ninguna incidencia coincide" : "No hay incidencias pendientes 🎉"} 
+              description={activeFiltersCount > 0 || busqueda ? "Intenta ajustar los filtros o la búsqueda." : "¡Todo está al día!"}
+              icon={FiInbox}
+              action={activeFiltersCount > 0 || busqueda ? { label: 'Limpiar filtros', onClick: clearFilters } : null}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Sheet Filters */}
+      {showFilters && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}></div>
+          <div className="relative bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl p-6 pb-8 animate-slide-up">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filtros</h3>
+              <button onClick={() => setShowFilters(false)} className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-full"><FiX /></button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Estado</label>
+                <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none dark:text-white">
+                  <option value="">Todos los estados</option>
+                  {estados.map(e => <option key={e.IdEstado} value={e.IdEstado}>{e.Nombre}</option>)}
+                </select>
+              </div>
+              <div className="flex space-x-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Desde</label>
+                  <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Hasta</label>
+                  <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm dark:text-white outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Orden</label>
+                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+                  <button onClick={() => setOrdenFecha('desc')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${ordenFecha === 'desc' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>Más recientes</button>
+                  <button onClick={() => setOrdenFecha('asc')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${ordenFecha === 'asc' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>Más antiguas</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button onClick={clearFilters} className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-colors hover:bg-gray-200 dark:hover:bg-gray-700">Limpiar</button>
+              <button onClick={() => setShowFilters(false)} className="flex-1 py-3.5 bg-brand-blue text-white font-bold rounded-xl transition-colors hover:bg-blue-600 shadow-lg shadow-blue-500/30">Aplicar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

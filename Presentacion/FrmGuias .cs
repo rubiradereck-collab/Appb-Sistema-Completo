@@ -34,7 +34,6 @@ namespace Presentacion
             grid.SelectionChanged += grid_SelectionChanged;
             txtBuscar.TextChanged += txtBuscar_TextChanged;
             grid.ColumnHeaderMouseClick += grid_ColumnHeaderMouseClick;
-            ConfigurarPlaceholder(txtCorreoDestino, "correo@ejemplo.com");
             CargarGrid();
             LimpiarFormulario();
             toolTip1.SetToolTip(button1, "Limpiar el formulario para crear una nueva guía");

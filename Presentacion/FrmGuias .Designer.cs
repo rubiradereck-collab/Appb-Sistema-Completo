@@ -34,8 +34,6 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmGuias));
             this.panelFormulario = new System.Windows.Forms.Panel();
             this.lblSinDatos = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
-            this.txtCorreoDestino = new System.Windows.Forms.TextBox();
             this.btnEnviarCorreo = new System.Windows.Forms.Button();
             this.lblContador = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
@@ -63,8 +61,6 @@
             // 
             this.panelFormulario.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(21)))), ((int)(((byte)(50)))), ((int)(((byte)(80)))));
             this.panelFormulario.Controls.Add(this.lblSinDatos);
-            this.panelFormulario.Controls.Add(this.label3);
-            this.panelFormulario.Controls.Add(this.txtCorreoDestino);
             this.panelFormulario.Controls.Add(this.btnEnviarCorreo);
             this.panelFormulario.Controls.Add(this.lblContador);
             this.panelFormulario.Controls.Add(this.label9);
@@ -98,25 +94,6 @@
             this.lblSinDatos.Text = "...";
             this.lblSinDatos.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.lblSinDatos.Visible = false;
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label3.ForeColor = System.Drawing.Color.White;
-            this.label3.Location = new System.Drawing.Point(43, 373);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(109, 28);
-            this.label3.TabIndex = 61;
-            this.label3.Text = "✉️ Correo";
-            // 
-            // txtCorreoDestino
-            // 
-            this.txtCorreoDestino.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.txtCorreoDestino.Location = new System.Drawing.Point(152, 370);
-            this.txtCorreoDestino.Name = "txtCorreoDestino";
-            this.txtCorreoDestino.Size = new System.Drawing.Size(413, 34);
-            this.txtCorreoDestino.TabIndex = 35;
             // 
             // btnEnviarCorreo
             // 
@@ -381,8 +358,6 @@
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.ErrorProvider errorProvider1;
         private System.Windows.Forms.Button btnEnviarCorreo;
-        private System.Windows.Forms.TextBox txtCorreoDestino;
-        private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label lblSinDatos;
     }
 }

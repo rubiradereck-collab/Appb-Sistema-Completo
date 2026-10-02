@@ -1,3 +1,4 @@
+using Presentacion.Formularios.Compartido;
 ﻿using Logica.Gestion_de_Logica;
 using Reportes;
 using System;
@@ -20,6 +21,7 @@ namespace Presentacion
         public FrmDashboard()
         {
             InitializeComponent();
+            if (this.btnEnviarCorreo != null) this.btnEnviarCorreo.Click += new System.EventHandler(this.btnEnviarCorreo_Click);
             TemaModerno.Aplicar(this);
             toolTip1.SetToolTip(btnRefrescar, "Actualizar las métricas y gráficos");
             ConfigurarChart(chartEstado, "Incidencias por Estado", "Estado");
@@ -247,6 +249,67 @@ namespace Presentacion
         {
 
         }
-    }
+    
+        private async void btnEnviarCorreo_Click(object sender, EventArgs e)
+        {
+            var frmEnvio = new FrmEnviarCorreo("", "Reporte de Dashboard - Sistema de Incidencias APPB", true);
+            frmEnvio.ShowDialog();
+
+            if (!frmEnvio.ConfirmaEnvio) return;
+
+            btnEnviarCorreo.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+
+            try
+            {
+                string correoDestino = frmEnvio.CorreoDestino;
+                string asunto = frmEnvio.Asunto;
+                string mensaje = frmEnvio.Mensaje;
+                bool adjuntarExcel = frmEnvio.AdjuntarExcel;
+
+                await Task.Run(() =>
+                {
+                    var todas = new Logica.Gestion_de_Logica.IncidenciaLN().ShowIncidencia();
+                    var filtro = ConstruirFiltroPorRango();
+                    var filtradas = Reportes.IncidenciaReportes.Filtrar(todas, filtro);
+
+                    var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
+                    
+                    byte[] pdf = Reportes.IncidenciaReportes.GenerarPdfListado(filtradas, "Reporte de Incidencias - Dashboard");
+                    adjuntos.Add(new Tuple<byte[], string>(pdf, "Reporte_Dashboard.pdf"));
+
+                    if (adjuntarExcel)
+                    {
+                        byte[] excel = Reportes.IncidenciaReportes.GenerarExcelListado(filtradas);
+                        adjuntos.Add(new Tuple<byte[], string>(excel, "Reporte_Dashboard.xlsx"));
+                    }
+
+                    Logica.Gestion_de_Logica.CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    
+                    // No hay un idUsuario global en FrmDashboard fácilmente accesible (usualmente se pasaría en el constructor),
+                    // usaremos un 0 o null para la auditoría, y "Dashboard" como nombre
+                    new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
+                        null,
+                        "Sistema / Dashboard",
+                        "Enviar correo",
+                        "Dashboard",
+                        null,
+                        $"Destinatario: {correoDestino}, Archivos: {adjuntos.Count}"
+                    );
+                });
+
+                MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al enviar el correo:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnEnviarCorreo.Enabled = true;
+                this.Cursor = Cursors.Default;
+            }
+        }
+}
     }
 

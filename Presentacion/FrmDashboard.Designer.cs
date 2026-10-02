@@ -68,8 +68,9 @@
             this.tabArea = new System.Windows.Forms.TabPage();
             this.chartArea = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.tabTendencia = new System.Windows.Forms.TabPage();
-            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.chartTendencia = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.btnEnviarCorreo = new System.Windows.Forms.Button();
             this.panelToolbar.SuspendLayout();
             this.flowTarjetas.SuspendLayout();
             this.panelTotal.SuspendLayout();
@@ -90,6 +91,7 @@
             // panelToolbar
             // 
             this.panelToolbar.BackColor = System.Drawing.Color.White;
+            this.panelToolbar.Controls.Add(this.btnEnviarCorreo);
             this.panelToolbar.Controls.Add(this.dtpHasta);
             this.panelToolbar.Controls.Add(this.dtpDesde);
             this.panelToolbar.Controls.Add(this.cboRangoFecha);
@@ -443,6 +445,21 @@
             this.chartTendencia.TabIndex = 1;
             this.chartTendencia.Text = "chart1";
             // 
+            // btnEnviarCorreo
+            // 
+            this.btnEnviarCorreo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnEnviarCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
+            this.btnEnviarCorreo.FlatAppearance.BorderSize = 0;
+            this.btnEnviarCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnEnviarCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnEnviarCorreo.ForeColor = System.Drawing.Color.White;
+            this.btnEnviarCorreo.Location = new System.Drawing.Point(546, 3);
+            this.btnEnviarCorreo.Name = "btnEnviarCorreo";
+            this.btnEnviarCorreo.Size = new System.Drawing.Size(140, 35);
+            this.btnEnviarCorreo.TabIndex = 31;
+            this.btnEnviarCorreo.Text = "📧 Enviar por Correo";
+            this.btnEnviarCorreo.UseVisualStyleBackColor = false;
+            // 
             // FrmDashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -509,5 +526,6 @@
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.TabPage tabTendencia;
         private System.Windows.Forms.DataVisualization.Charting.Chart chartTendencia;
+        private System.Windows.Forms.Button btnEnviarCorreo;
     }
 }

@@ -34,6 +34,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmIncidencias));
             this.grid = new System.Windows.Forms.DataGridView();
             this.panelFormulario = new System.Windows.Forms.Panel();
+            this.lblSinDatos = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
             this.txtBusquedaRapida = new System.Windows.Forms.TextBox();
             this.btnFiltros = new System.Windows.Forms.Button();
@@ -60,7 +61,7 @@
             this.label1 = new System.Windows.Forms.Label();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.errorProvider1 = new System.Windows.Forms.ErrorProvider(this.components);
-            this.lblSinDatos = new System.Windows.Forms.Label();
+            this.btnCorreo = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.grid)).BeginInit();
             this.panelFormulario.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.errorProvider1)).BeginInit();
@@ -104,6 +105,7 @@
             // panelFormulario
             // 
             this.panelFormulario.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(21)))), ((int)(((byte)(50)))), ((int)(((byte)(80)))));
+            this.panelFormulario.Controls.Add(this.btnCorreo);
             this.panelFormulario.Controls.Add(this.lblSinDatos);
             this.panelFormulario.Controls.Add(this.label9);
             this.panelFormulario.Controls.Add(this.txtBusquedaRapida);
@@ -136,6 +138,19 @@
             this.panelFormulario.Size = new System.Drawing.Size(861, 559);
             this.panelFormulario.TabIndex = 1;
             this.panelFormulario.Paint += new System.Windows.Forms.PaintEventHandler(this.panelFormulario_Paint);
+            // 
+            // lblSinDatos
+            // 
+            this.lblSinDatos.AutoSize = true;
+            this.lblSinDatos.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSinDatos.ForeColor = System.Drawing.Color.White;
+            this.lblSinDatos.Location = new System.Drawing.Point(23, 394);
+            this.lblSinDatos.Name = "lblSinDatos";
+            this.lblSinDatos.Size = new System.Drawing.Size(27, 28);
+            this.lblSinDatos.TabIndex = 63;
+            this.lblSinDatos.Text = "...";
+            this.lblSinDatos.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.lblSinDatos.Visible = false;
             // 
             // label9
             // 
@@ -432,18 +447,20 @@
             // 
             this.errorProvider1.ContainerControl = this;
             // 
-            // lblSinDatos
+            // btnCorreo
             // 
-            this.lblSinDatos.AutoSize = true;
-            this.lblSinDatos.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblSinDatos.ForeColor = System.Drawing.Color.White;
-            this.lblSinDatos.Location = new System.Drawing.Point(23, 394);
-            this.lblSinDatos.Name = "lblSinDatos";
-            this.lblSinDatos.Size = new System.Drawing.Size(27, 28);
-            this.lblSinDatos.TabIndex = 63;
-            this.lblSinDatos.Text = "...";
-            this.lblSinDatos.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.lblSinDatos.Visible = false;
+            this.btnCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
+            this.btnCorreo.FlatAppearance.BorderSize = 0;
+            this.btnCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnCorreo.ForeColor = System.Drawing.Color.White;
+            this.btnCorreo.Location = new System.Drawing.Point(578, 385);
+            this.btnCorreo.Name = "btnCorreo";
+            this.btnCorreo.Size = new System.Drawing.Size(271, 48);
+            this.btnCorreo.TabIndex = 64;
+            this.btnCorreo.Text = "📧 Enviar por Correo";
+            this.btnCorreo.UseVisualStyleBackColor = false;
+            this.btnCorreo.Click += new System.EventHandler(this.btnCorreo_Click);
             // 
             // FrmIncidencias
             // 
@@ -499,5 +516,6 @@
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.ErrorProvider errorProvider1;
         private System.Windows.Forms.Label lblSinDatos;
+        private System.Windows.Forms.Button btnCorreo;
     }
 }

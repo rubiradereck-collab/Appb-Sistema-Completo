@@ -36,26 +36,9 @@ namespace Presentacion
         private string columnaOrdenada = null;
 
         
-        private System.Windows.Forms.Button btnEnviarCorreo;
         
-        private void AgregarBotonCorreo()
-        {
-            this.btnEnviarCorreo = new System.Windows.Forms.Button();
-            this.btnEnviarCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
-            this.btnEnviarCorreo.FlatAppearance.BorderSize = 0;
-            this.btnEnviarCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnEnviarCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnEnviarCorreo.ForeColor = System.Drawing.Color.White;
-            this.btnEnviarCorreo.Location = new System.Drawing.Point(578, 330);
-            this.btnEnviarCorreo.Name = "btnEnviarCorreo";
-            this.btnEnviarCorreo.Size = new System.Drawing.Size(271, 48);
-            this.btnEnviarCorreo.TabIndex = 23;
-            this.btnEnviarCorreo.Text = "✉ Enviar por Correo";
-            this.btnEnviarCorreo.UseVisualStyleBackColor = false;
-            this.btnEnviarCorreo.Click += new System.EventHandler(this.btnEnviarCorreo_Click);
-            this.panelFormulario.Controls.Add(this.btnEnviarCorreo);
-            this.toolTip1.SetToolTip(this.btnEnviarCorreo, "Enviar reporte por correo electrónico");
-        }
+        
+        
 
         public FrmIncidencias(Usuario usuarioActual)
         {
@@ -69,7 +52,7 @@ namespace Presentacion
             toolTip1.SetToolTip(btnFiltros, "Filtrar por estado o rango de fechas");
             toolTip1.SetToolTip(txtBusquedaRapida, "Buscar por número de ticket");
             this.usuarioActual = usuarioActual;
-            AgregarBotonCorreo();
+            
             grid.SelectionChanged += grid_SelectionChanged;
             txtBusquedaRapida.TextChanged += txtBusquedaRapida_TextChanged;
             grid.ColumnHeaderMouseClick += grid_ColumnHeaderMouseClick;  
@@ -567,7 +550,7 @@ namespace Presentacion
             }
         }
     
-        private async void btnEnviarCorreo_Click(object sender, EventArgs e)
+        private async void btnCorreo_Click(object sender, EventArgs e)
         {
             var frmOpciones = new Form();
             frmOpciones.Text = "Opciones de Envío";
@@ -600,7 +583,7 @@ namespace Presentacion
 
             if (!frmEnvio.ConfirmaEnvio) return;
 
-            btnEnviarCorreo.Enabled = false;
+            btnCorreo.Enabled = false;
             this.Cursor = Cursors.WaitCursor;
 
             try
@@ -649,11 +632,13 @@ namespace Presentacion
             }
             finally
             {
-                btnEnviarCorreo.Enabled = true;
+                btnCorreo.Enabled = true;
                 this.Cursor = Cursors.Default;
             }
         }
-}
+
+        
+    }
 }
 
 

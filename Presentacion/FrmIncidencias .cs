@@ -116,6 +116,7 @@ namespace Presentacion
                 cboEstado.Enabled = false;
                 cboTecnico.Enabled = false;
                 DeshabilitarBoton(btnEliminar);
+                btnCorreo.Visible = false;
             }
             else if (usuarioActual.Rol == "Técnico")
             {
@@ -578,7 +579,7 @@ namespace Presentacion
 
             if (opcion == 0) return;
 
-            var frmEnvio = new FrmEnviarCorreo(usuarioActual.Correo, opcion == 1 ? "Reporte de Incidencias" : $"Detalle Incidencia #{incidenciaSeleccionada.IdIncidencia}", opcion == 1);
+            var frmEnvio = new FrmEnviarCorreo(usuarioActual.Correo, opcion == 1 ? "Reporte de Incidencias" : $"Detalle Incidencia {incidenciaSeleccionada.NumeroTicket}", opcion == 1);
             frmEnvio.ShowDialog();
 
             if (!frmEnvio.ConfirmaEnvio) return;
@@ -590,7 +591,7 @@ namespace Presentacion
             {
                 string correoDestino = frmEnvio.CorreoDestino;
                 string asunto = frmEnvio.Asunto;
-                string mensaje = frmEnvio.Mensaje;
+                string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrará el reporte de incidencias generado desde el Sistema de Incidencias APPB." : frmEnvio.Mensaje;
                 bool adjuntarExcel = frmEnvio.AdjuntarExcel;
                 var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
 

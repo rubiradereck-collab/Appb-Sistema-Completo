@@ -4,7 +4,7 @@
 #define MyAppExeName "Presentacion.exe"
 
 [Setup]
-AppId={{F1A65E12-ABCD-4321-BBBB-123456789ABC}
+AppId={{82B9F472-FD77-4A5A-8DFF-B5B0A6475517}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -57,3 +57,4 @@ begin
     Result := False;
   end;
 end;
+

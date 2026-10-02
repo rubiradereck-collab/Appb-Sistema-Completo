@@ -18,9 +18,11 @@ namespace Presentacion
 {
     public partial class FrmDashboard : Form
     {
-        public FrmDashboard()
+        private Entidades.Gestion_de_Entidades.Usuario _usuarioActual;
+        public FrmDashboard(Entidades.Gestion_de_Entidades.Usuario usuarioActual)
         {
             InitializeComponent();
+            _usuarioActual = usuarioActual;
             if (this.btnEnviarCorreo != null) this.btnEnviarCorreo.Click += new System.EventHandler(this.btnEnviarCorreo_Click);
             TemaModerno.Aplicar(this);
             toolTip1.SetToolTip(btnRefrescar, "Actualizar las métricas y gráficos");
@@ -252,7 +254,7 @@ namespace Presentacion
     
         private async void btnEnviarCorreo_Click(object sender, EventArgs e)
         {
-            var frmEnvio = new FrmEnviarCorreo("", "Reporte de Dashboard - Sistema de Incidencias APPB", true);
+            var frmEnvio = new FrmEnviarCorreo(_usuarioActual.Correo, "Reporte de Dashboard - Sistema de Incidencias APPB", true);
             frmEnvio.ShowDialog();
 
             if (!frmEnvio.ConfirmaEnvio) return;
@@ -264,7 +266,7 @@ namespace Presentacion
             {
                 string correoDestino = frmEnvio.CorreoDestino;
                 string asunto = frmEnvio.Asunto;
-                string mensaje = frmEnvio.Mensaje;
+                string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrará el reporte de incidencias generado desde el Sistema de Incidencias APPB." : frmEnvio.Mensaje;
                 bool adjuntarExcel = frmEnvio.AdjuntarExcel;
 
                 await Task.Run(() =>
@@ -289,8 +291,8 @@ namespace Presentacion
                     // No hay un idUsuario global en FrmDashboard fácilmente accesible (usualmente se pasaría en el constructor),
                     // usaremos un 0 o null para la auditoría, y "Dashboard" como nombre
                     new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
-                        null,
-                        "Sistema / Dashboard",
+                        _usuarioActual.IdUsuario,
+                        $"{_usuarioActual.Nombre} {_usuarioActual.Apellido}",
                         "Enviar correo",
                         "Dashboard",
                         null,

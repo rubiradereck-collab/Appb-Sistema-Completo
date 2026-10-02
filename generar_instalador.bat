@@ -15,7 +15,17 @@ if "%MSBUILD_PATH%"=="" (
   exit /b 1
 )
 
-echo [1/2] Compilando la solucion en Release...
+echo [1/3] Restaurando paquetes NuGet...
+"%MSBUILD_PATH%" APPB.slnx /t:Restore /p:RestorePackagesConfig=true
+if %errorlevel% neq 0 (
+  echo.
+  echo ERROR: Fallo la restauracion de NuGet.
+  pause
+  exit /b %errorlevel%
+)
+
+echo.
+echo [2/3] Compilando la solucion en Release...
 "%MSBUILD_PATH%" Presentacion\Presentacion.csproj /t:Rebuild /p:Configuration=Release
 if %errorlevel% neq 0 (
   echo.
@@ -25,7 +35,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/2] Generando instalador con Inno Setup...
+echo [3/3] Generando instalador con Inno Setup...
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" generar_instalador.iss
 if %errorlevel% neq 0 (
   echo.
@@ -36,3 +46,5 @@ if %errorlevel% neq 0 (
 
 echo.
 echo EXITO: El instalador se ha generado correctamente en la carpeta Output\
+
+

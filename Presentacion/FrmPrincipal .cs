@@ -124,7 +124,7 @@ namespace Presentacion
 
         private void btnDashboard_Click(object sender, EventArgs e)
         {
-            AbrirHijo(new FrmDashboard());
+            AbrirHijo(new FrmDashboard(_usuarioActual));
         }
 
         private void btnGuias_Click(object sender, EventArgs e)

@@ -34,6 +34,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmIncidencias));
             this.grid = new System.Windows.Forms.DataGridView();
             this.panelFormulario = new System.Windows.Forms.Panel();
+            this.btnCorreo = new System.Windows.Forms.Button();
             this.lblSinDatos = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
             this.txtBusquedaRapida = new System.Windows.Forms.TextBox();
@@ -61,7 +62,6 @@
             this.label1 = new System.Windows.Forms.Label();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.errorProvider1 = new System.Windows.Forms.ErrorProvider(this.components);
-            this.btnCorreo = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.grid)).BeginInit();
             this.panelFormulario.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.errorProvider1)).BeginInit();
@@ -139,6 +139,21 @@
             this.panelFormulario.TabIndex = 1;
             this.panelFormulario.Paint += new System.Windows.Forms.PaintEventHandler(this.panelFormulario_Paint);
             // 
+            // btnCorreo
+            // 
+            this.btnCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
+            this.btnCorreo.FlatAppearance.BorderSize = 0;
+            this.btnCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnCorreo.ForeColor = System.Drawing.Color.White;
+            this.btnCorreo.Location = new System.Drawing.Point(578, 336);
+            this.btnCorreo.Name = "btnCorreo";
+            this.btnCorreo.Size = new System.Drawing.Size(271, 45);
+            this.btnCorreo.TabIndex = 64;
+            this.btnCorreo.Text = "📧 Enviar por Correo";
+            this.btnCorreo.UseVisualStyleBackColor = false;
+            this.btnCorreo.Click += new System.EventHandler(this.btnCorreo_Click);
+            // 
             // lblSinDatos
             // 
             this.lblSinDatos.AutoSize = true;
@@ -180,9 +195,9 @@
             this.btnFiltros.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnFiltros.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnFiltros.ForeColor = System.Drawing.Color.White;
-            this.btnFiltros.Location = new System.Drawing.Point(578, 330);
+            this.btnFiltros.Location = new System.Drawing.Point(578, 285);
             this.btnFiltros.Name = "btnFiltros";
-            this.btnFiltros.Size = new System.Drawing.Size(271, 48);
+            this.btnFiltros.Size = new System.Drawing.Size(271, 45);
             this.btnFiltros.TabIndex = 24;
             this.btnFiltros.Text = "🔍 Filtros";
             this.btnFiltros.UseVisualStyleBackColor = false;
@@ -206,9 +221,9 @@
             this.btnExportarExcel.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnExportarExcel.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnExportarExcel.ForeColor = System.Drawing.Color.White;
-            this.btnExportarExcel.Location = new System.Drawing.Point(578, 273);
+            this.btnExportarExcel.Location = new System.Drawing.Point(578, 233);
             this.btnExportarExcel.Name = "btnExportarExcel";
-            this.btnExportarExcel.Size = new System.Drawing.Size(271, 48);
+            this.btnExportarExcel.Size = new System.Drawing.Size(271, 45);
             this.btnExportarExcel.TabIndex = 22;
             this.btnExportarExcel.Text = "📊 Exportar Excel";
             this.btnExportarExcel.UseVisualStyleBackColor = false;
@@ -221,9 +236,9 @@
             this.btnExportarPdf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnExportarPdf.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnExportarPdf.ForeColor = System.Drawing.Color.White;
-            this.btnExportarPdf.Location = new System.Drawing.Point(578, 216);
+            this.btnExportarPdf.Location = new System.Drawing.Point(578, 182);
             this.btnExportarPdf.Name = "btnExportarPdf";
-            this.btnExportarPdf.Size = new System.Drawing.Size(271, 48);
+            this.btnExportarPdf.Size = new System.Drawing.Size(271, 45);
             this.btnExportarPdf.TabIndex = 21;
             this.btnExportarPdf.Text = "📄 Exportar PDF";
             this.btnExportarPdf.UseVisualStyleBackColor = false;
@@ -236,9 +251,9 @@
             this.btnEliminar.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnEliminar.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnEliminar.ForeColor = System.Drawing.Color.White;
-            this.btnEliminar.Location = new System.Drawing.Point(578, 162);
+            this.btnEliminar.Location = new System.Drawing.Point(578, 131);
             this.btnEliminar.Name = "btnEliminar";
-            this.btnEliminar.Size = new System.Drawing.Size(271, 48);
+            this.btnEliminar.Size = new System.Drawing.Size(271, 45);
             this.btnEliminar.TabIndex = 20;
             this.btnEliminar.Text = "🗑 Eliminar";
             this.btnEliminar.UseVisualStyleBackColor = false;
@@ -251,9 +266,9 @@
             this.btnGuardar.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnGuardar.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnGuardar.ForeColor = System.Drawing.Color.White;
-            this.btnGuardar.Location = new System.Drawing.Point(578, 108);
+            this.btnGuardar.Location = new System.Drawing.Point(578, 80);
             this.btnGuardar.Name = "btnGuardar";
-            this.btnGuardar.Size = new System.Drawing.Size(271, 48);
+            this.btnGuardar.Size = new System.Drawing.Size(271, 45);
             this.btnGuardar.TabIndex = 19;
             this.btnGuardar.Text = "💾 Guardar";
             this.btnGuardar.UseVisualStyleBackColor = false;
@@ -266,9 +281,9 @@
             this.btnNuevo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnNuevo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnNuevo.ForeColor = System.Drawing.Color.White;
-            this.btnNuevo.Location = new System.Drawing.Point(578, 51);
+            this.btnNuevo.Location = new System.Drawing.Point(578, 29);
             this.btnNuevo.Name = "btnNuevo";
-            this.btnNuevo.Size = new System.Drawing.Size(271, 48);
+            this.btnNuevo.Size = new System.Drawing.Size(271, 45);
             this.btnNuevo.TabIndex = 18;
             this.btnNuevo.Text = "➕ Nuevo";
             this.btnNuevo.UseVisualStyleBackColor = false;
@@ -446,21 +461,6 @@
             // errorProvider1
             // 
             this.errorProvider1.ContainerControl = this;
-            // 
-            // btnCorreo
-            // 
-            this.btnCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
-            this.btnCorreo.FlatAppearance.BorderSize = 0;
-            this.btnCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnCorreo.ForeColor = System.Drawing.Color.White;
-            this.btnCorreo.Location = new System.Drawing.Point(578, 385);
-            this.btnCorreo.Name = "btnCorreo";
-            this.btnCorreo.Size = new System.Drawing.Size(271, 48);
-            this.btnCorreo.TabIndex = 64;
-            this.btnCorreo.Text = "📧 Enviar por Correo";
-            this.btnCorreo.UseVisualStyleBackColor = false;
-            this.btnCorreo.Click += new System.EventHandler(this.btnCorreo_Click);
             // 
             // FrmIncidencias
             // 

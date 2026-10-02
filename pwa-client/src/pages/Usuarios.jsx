@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import Header from '../components/Header';
 import api from '../api';
-import { FiUsers, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiDownload } from 'react-icons/fi';
+import { FiUsers, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiDownload, FiX } from 'react-icons/fi';
 import { exportGenericExcel, exportGenericPDF } from '../utils/exportUtils';
 
 const Usuarios = () => {

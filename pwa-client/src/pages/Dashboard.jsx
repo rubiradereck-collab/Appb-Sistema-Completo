@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import Header from '../components/Header';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { FiRefreshCw, FiList, FiClock, FiCheckSquare, FiAlertCircle, FiDownload, FiMail, FiX } from 'react-icons/fi';
-import ExcelJS from 'exceljs';
-import pdfMake from "pdfmake/build/pdfmake";
-import pdfFonts from "pdfmake/build/vfs_fonts";
-pdfMake.vfs = pdfFonts;
+import { exportToPDF, exportToExcel } from '../utils/exportUtils';
+
+
+
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { isDarkMode, autoRefresh, refreshInterval } = useSettings();
   const [incidencias, setIncidencias] = useState([]);
   const [estados, setEstados] = useState([]);
   const [areas, setAreas] = useState([]);
@@ -84,94 +86,17 @@ const Dashboard = () => {
   const dataTendencia = Object.keys(fechasCount).map(k => ({ fecha: k, tickets: fechasCount[k] }));
 
   // Handlers para los botones de exportación (Placeholders)
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!incidencias || incidencias.length === 0) {
-      const errorMsg = error.response?.data?.message || 'No hay datos para exportar';
-      window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
+      window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos para exportar'}));
       return;
     }
-
-    const docDefinition = {
-      pageSize: 'A4',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 60, 40, 60],
-      header: function() {
-        return {
-          columns: [
-            {
-              stack: [
-                { text: 'SISTEMA DE GESTIÓN DE INCIDENCIAS APPB', color: '#2B6B9A', fontSize: 9, bold: true, characterSpacing: 1 },
-                { text: 'Reporte General de Incidencias', color: '#153250', fontSize: 24, bold: true, margin: [0, 4, 0, 0] }
-              ],
-              margin: [40, 20, 0, 0]
-            }
-          ]
-        };
-      },
-      footer: function(currentPage, pageCount) {
-        return {
-          columns: [
-            { text: `Generado el: ${new Date().toLocaleString()}`, color: 'gray', fontSize: 8, alignment: 'left', margin: [40, 0] },
-            { text: `Página ${currentPage} de ${pageCount}`, color: 'gray', fontSize: 8, alignment: 'right', margin: [0, 0, 40, 0] }
-          ]
-        };
-      },
-      content: [
-        {
-          table: {
-            headerRows: 1,
-            widths: ['auto', 'auto', 'auto', 'auto', 'auto', '*', 'auto', 'auto'],
-            body: [
-              [
-                { text: 'TICKET', style: 'tableHeader' },
-                { text: 'FECHA', style: 'tableHeader' },
-                { text: 'ÁREA', style: 'tableHeader' },
-                { text: 'PRIORIDAD', style: 'tableHeader' },
-                { text: 'ESTADO', style: 'tableHeader' },
-                { text: 'EMPLEADO', style: 'tableHeader' },
-                { text: 'TÉCNICO', style: 'tableHeader' },
-                { text: 'SLA', style: 'tableHeader' }
-              ],
-              ...incidencias.map((i, index) => {
-                const isPair = index % 2 === 0;
-                const rowBg = isPair ? '#F5F6FA' : '#FFFFFF';
-                return [
-                  { text: i.NumeroTicket || `Solicitud-${i.IdIncidencia}`, fillColor: rowBg, fontSize: 9, bold: true, color: '#153250' },
-                  { text: new Date(i.Fecha).toLocaleDateString(), fillColor: rowBg, fontSize: 9 },
-                  { text: i.NombreArea || '', fillColor: rowBg, fontSize: 9 },
-                  { text: i.NombrePrioridad || '', fillColor: rowBg, fontSize: 9 },
-                  { text: i.NombreEstado || '', fillColor: rowBg, fontSize: 9 },
-                  { text: i.Empleado || '', fillColor: rowBg, fontSize: 9 },
-                  { text: i.NombreTecnicoAsignado || 'Sin Asignar', fillColor: rowBg, fontSize: 9 },
-                  { text: i.EscaladoSLA ? 'Vencido' : 'Normal', fillColor: rowBg, fontSize: 9, color: i.EscaladoSLA ? 'red' : 'green', bold: i.EscaladoSLA }
-                ];
-              })
-            ]
-          },
-          layout: {
-            hLineWidth: function (i, node) { return (i === 0 || i === 1 || i === node.table.body.length) ? 1 : 0; },
-            vLineWidth: function (i, node) { return 0; },
-            hLineColor: function (i, node) { return i === 1 ? '#B4C8DC' : '#E0E0E0'; },
-            paddingLeft: function(i, node) { return 4; },
-            paddingRight: function(i, node) { return 4; },
-            paddingTop: function(i, node) { return 6; },
-            paddingBottom: function(i, node) { return 6; }
-          }
-        }
-      ],
-      styles: {
-        tableHeader: {
-          bold: true,
-          fontSize: 10,
-          color: '#FFFFFF',
-          fillColor: '#153250',
-          margin: [0, 4, 0, 4]
-        }
-      }
-    };
-
-    pdfMake.createPdf(docDefinition).download(`Reporte_Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
-    window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte PDF descargado exitosamente'}));
+    try {
+      await exportToPDF(incidencias, 'Reporte de Incidencias', `Reporte_Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error(err);
+      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al exportar reporte PDF'}));
+    }
   };
 
   const handleOpenEmailModal = () => {
@@ -374,11 +299,11 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="85%">
                 {activeTab === 'tendencia' ? (
                   <LineChart data={dataTendencia} margin={{ top: 20, right: 30, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === "dark" ? "#374151" : "#e5e7eb"} />
-                    <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: theme === 'dark' ? '#9ca3af' : '#6b7280' }} dy={10} />
-                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: theme === 'dark' ? '#d1d5db' : '#4b5563' }} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#ffffff' : '#000000' }} />
-                  <Line type="monotone" dataKey="tickets" stroke="#2988c9" strokeWidth={3} dot={{ r: 4, fill: "#2988c9", strokeWidth: 2, stroke: theme === "dark" ? "#1f2937" : "#fff" }} activeDot={{ r: 6 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? "#374151" : "#e5e7eb"} />
+                    <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDarkMode ? '#9ca3af' : '#6b7280' }} dy={10} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDarkMode ? '#d1d5db' : '#4b5563' }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: isDarkMode ? '#1f2937' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000' }} />
+                  <Line type="monotone" dataKey="tickets" stroke="#2988c9" strokeWidth={3} dot={{ r: 4, fill: "#2988c9", strokeWidth: 2, stroke: isDarkMode ? "#1f2937" : "#fff" }} activeDot={{ r: 6 }} />
                 </LineChart>
               ) : (
                 <PieChart>
@@ -396,8 +321,8 @@ const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#ffffff' : '#000000' }} />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: theme === 'dark' ? '#d1d5db' : '#4b5563' }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold', backgroundColor: isDarkMode ? '#1f2937' : '#ffffff', color: isDarkMode ? '#ffffff' : '#000000' }} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: isDarkMode ? '#d1d5db' : '#4b5563' }} />
                 </PieChart>
               )}
             </ResponsiveContainer>

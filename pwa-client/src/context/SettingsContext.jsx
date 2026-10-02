@@ -12,6 +12,7 @@ export const SettingsProvider = ({ children }) => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(15000); // ms
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -42,6 +43,7 @@ export const SettingsProvider = ({ children }) => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    setIsDarkMode(isDark);
 
     if (Capacitor.isNativePlatform()) {
       StatusBar.setBackgroundColor({ color: isDark ? '#0f172a' : '#162d47' });
@@ -78,7 +80,7 @@ export const SettingsProvider = ({ children }) => {
   };
 
   return (
-    <SettingsContext.Provider value={{ theme, updateTheme, autoRefresh, updateAutoRefresh, refreshInterval, updateRefreshInterval, settingsLoaded }}>
+    <SettingsContext.Provider value={{ theme, updateTheme, autoRefresh, updateAutoRefresh, refreshInterval, updateRefreshInterval, settingsLoaded, isDarkMode }}>
       {children}
     </SettingsContext.Provider>
   );

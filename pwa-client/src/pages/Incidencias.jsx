@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import Header from '../components/Header';
-import { FiPlus, FiFilter, FiSearch, FiDownload } from 'react-icons/fi';
+import { FiPlus, FiFilter, FiSearch, FiDownload, FiAlertCircle } from 'react-icons/fi';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 
 const Incidencias = ({ filterTecnico = false }) => {
   const { user } = useAuth();
+  const { autoRefresh, refreshInterval } = useSettings();
   const [incidencias, setIncidencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [estados, setEstados] = useState([]);
@@ -22,9 +24,9 @@ const Incidencias = ({ filterTecnico = false }) => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 15000); // Actualiza cada 15s para sincronizar con el Bot
-    return () => clearInterval(interval);
   }, [filterTecnico]);
+
+  useAutoRefresh(() => fetchData(true), autoRefresh ? refreshInterval : null);
 
   const fetchData = async (isAutoRefresh = false) => {
     if (!isAutoRefresh) setLoading(true);

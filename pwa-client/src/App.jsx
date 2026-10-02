@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { FiAlertCircle } from 'react-icons/fi';
+import BottomNav from './components/BottomNav';
 import Login from './pages/Login';
 import { Configuracion } from './pages/Configuracion';
 import Dashboard from './pages/Dashboard';
@@ -95,6 +96,7 @@ function App() {
           <Route path="/areas" element={<ProtectedRoute allowedRoles={['Administrador']}><Areas /></ProtectedRoute>} />
           <Route path="/auditoria" element={<ProtectedRoute allowedRoles={['Administrador']}><Auditoria /></ProtectedRoute>} />
         </Routes>
+          <BottomNav />
       </Router>
     </AuthProvider>
       </SettingsProvider>

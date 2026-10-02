@@ -16,7 +16,7 @@ if "%MSBUILD_PATH%"=="" (
 )
 
 echo [1/2] Compilando la solucion en Release...
-"%MSBUILD_PATH%" Appb.sln /t:Rebuild /p:Configuration=Release
+"%MSBUILD_PATH%" Presentacion\Presentacion.csproj /t:Rebuild /p:Configuration=Release
 if %errorlevel% neq 0 (
   echo.
   echo ERROR: La compilacion fallo. Deteniendo el proceso.
@@ -36,4 +36,3 @@ if %errorlevel% neq 0 (
 
 echo.
 echo EXITO: El instalador se ha generado correctamente en la carpeta Output\
-pause

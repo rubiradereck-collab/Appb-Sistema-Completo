@@ -19,15 +19,7 @@ namespace Logica.Gestion_de_Logica
             {
                 ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) =>
                 {
-                    if (sslPolicyErrors == SslPolicyErrors.None)
-                        return true;
-
-                    if (sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors)
-                    {
-                        if (certificate.Subject.Contains(servidor))
-                            return true;
-                    }
-                    return false;
+                    return sslPolicyErrors == SslPolicyErrors.None || sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors;
                 };
             }
         }
@@ -87,3 +79,4 @@ namespace Logica.Gestion_de_Logica
         }
     }
 }
+

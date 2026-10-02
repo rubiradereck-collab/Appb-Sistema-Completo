@@ -7,7 +7,8 @@
 		<add key="SmtpUsuario" value="soporte.tickets@appb.gob.ec" />
 		<add key="SmtpPassword" value="TU_NUEVO_PASSWORD_CORREO" />
 		<add key="SmtpUsarSsl" value="true" />
-	</appSettings>
+	  <add key="SmtpIgnorarCertificadoVencido" value="false" />
+  </appSettings>
     <startup> 
         <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.7.2" />
     </startup>
@@ -28,3 +29,4 @@
     </assemblyBinding>
   </runtime>
 </configuration>
+

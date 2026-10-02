@@ -8,7 +8,6 @@ export function useAutoRefresh(callback, delay) {
   const intervalRef = useRef(null);
   const isActiveRef = useRef(true);
   const isWaitingForConnectionRef = useRef(false);
-  const networkListenerRef = useRef(null);
 
   useEffect(() => {
     savedCallback.current = callback;
@@ -17,32 +16,41 @@ export function useAutoRefresh(callback, delay) {
   useEffect(() => {
     if (delay === null) return;
 
+    let isCancelled = false;
+    let networkListener = null;
+    let appListener = null;
+
     const executeIfConnected = async () => {
       const status = await Network.getStatus();
-      if (status.connected) {
+      if (status.connected && !isCancelled) {
         savedCallback.current(true);
       }
     };
 
     const tick = async () => {
-      if (!isActiveRef.current || isWaitingForConnectionRef.current) return;
+      if (!isActiveRef.current || isWaitingForConnectionRef.current || isCancelled) return;
       executeIfConnected();
     };
 
     intervalRef.current = setInterval(tick, delay);
 
     const handleNetworkRestore = async (status) => {
-      if (status.connected && isWaitingForConnectionRef.current && isActiveRef.current) {
+      if (status.connected && isWaitingForConnectionRef.current && isActiveRef.current && !isCancelled) {
         isWaitingForConnectionRef.current = false;
         savedCallback.current(true);
       }
     };
 
     Network.addListener('networkStatusChange', handleNetworkRestore).then(l => {
-      networkListenerRef.current = l;
+      if (isCancelled) {
+        l.remove();
+      } else {
+        networkListener = l;
+      }
     });
 
     const handleStateChange = async (state) => {
+      if (isCancelled) return;
       isActiveRef.current = state.isActive;
       if (state.isActive) {
         const status = await Network.getStatus();
@@ -55,22 +63,26 @@ export function useAutoRefresh(callback, delay) {
       }
     };
 
-    let appListener;
     const handleVisibilityChange = () => {
       handleStateChange({ isActive: document.visibilityState === 'visible' });
     };
 
     if (Capacitor.isNativePlatform()) {
       App.addListener('appStateChange', handleStateChange).then(l => {
-        appListener = l;
+        if (isCancelled) {
+          l.remove();
+        } else {
+          appListener = l;
+        }
       });
     } else {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
+      isCancelled = true;
       clearInterval(intervalRef.current);
-      if (networkListenerRef.current) networkListenerRef.current.remove();
+      if (networkListener) networkListener.remove();
       if (appListener) {
         appListener.remove();
       } else if (!Capacitor.isNativePlatform()) {

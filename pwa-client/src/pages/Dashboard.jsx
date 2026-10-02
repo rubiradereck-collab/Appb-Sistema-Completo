@@ -22,17 +22,17 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 15000);
-    return () => clearInterval(interval);
   }, [periodo]);
+
+  useAutoRefresh(() => fetchData(true), autoRefresh ? refreshInterval : null);
 
   const fetchData = async (isAutoRefresh = false) => {
     if (!isAutoRefresh) setLoading(true);
     try {
       const [incRes, estRes, areaRes] = await Promise.all([
-        api.get('/incidencias'),
-        api.get('/estados'),
-        api.get('/areas')
+        api.get('/incidencias', isAutoRefresh ? { silent: true } : {}),
+        api.get('/estados', isAutoRefresh ? { silent: true } : {}),
+        api.get('/areas', isAutoRefresh ? { silent: true } : {})
       ]);
       setIncidencias(incRes.data);
       setEstados(estRes.data);

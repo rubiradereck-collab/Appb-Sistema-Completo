@@ -30,8 +30,8 @@ const Incidencias = ({ filterTecnico = false }) => {
     if (!isAutoRefresh) setLoading(true);
     try {
       const [incRes, estRes] = await Promise.all([
-        api.get('/incidencias'), // El backend real trae todo, filtramos en el cliente
-        api.get('/estados')
+        api.get('/incidencias', isAutoRefresh ? { silent: true } : {}), // El backend real trae todo, filtramos en el cliente
+        api.get('/estados', isAutoRefresh ? { silent: true } : {})
       ]);
       setIncidencias(incRes.data);
       setEstados(estRes.data);

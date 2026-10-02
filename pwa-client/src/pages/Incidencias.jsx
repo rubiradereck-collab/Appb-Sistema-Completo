@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import { IncidentCard } from '../components/IncidentCard';
 import { CardSkeleton, EmptyState } from '../components/Skeletons';
 import { FiFilter, FiSearch, FiDownload, FiCheck, FiX, FiInbox, FiChevronDown, FiFileText, FiGrid } from 'react-icons/fi';
-import { exportGenericExcel, exportGenericPDF } from '../utils/exportUtils';
+import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 
 const Incidencias = ({ filterTecnico = false }) => {
   const { user } = useAuth();
@@ -62,19 +62,21 @@ const Incidencias = ({ filterTecnico = false }) => {
   // Given time constraints, a simple reload button/indicator at top or native pull is best.
 
   const incidenciasFiltradas = incidencias
-    .filter(i => filterTecnico ? i.IdTecnico === user.IdUsuario : true)
-    .filter(i => i.Asunto.toLowerCase().includes(busqueda.toLowerCase()) || i.IdIncidencia.toString().includes(busqueda))
+    
+    .filter(i => user?.Rol !== 'Usuario' || (i.Empleado || '').toLowerCase() === `${user.Nombre} ${user.Apellido}`.trim().toLowerCase())
+    .filter(i => filterTecnico ? i.IdTecnicoAsignado === user.IdUsuario : true)
+    .filter(i => (i.NumeroTicket || '').toLowerCase().includes(busqueda.toLowerCase()) || (i.Empleado || '').toLowerCase().includes(busqueda.toLowerCase()) || (i.TipoIncidencia || '').toLowerCase().includes(busqueda.toLowerCase()) || (i.Descripcion || '').toLowerCase().includes(busqueda.toLowerCase()))
     .filter(i => filtroEstado === '' || i.IdEstado.toString() === filtroEstado)
     .filter(i => {
       if (!fechaDesde && !fechaHasta) return true;
-      const f = new Date(i.FechaCreacion).getTime();
+      const f = new Date(i.Fecha).getTime();
       const d = fechaDesde ? new Date(fechaDesde).getTime() : 0;
       const h = fechaHasta ? new Date(fechaHasta).getTime() + 86400000 : Infinity;
       return f >= d && f <= h;
     })
     .sort((a, b) => {
-      const da = new Date(a.FechaCreacion).getTime();
-      const db = new Date(b.FechaCreacion).getTime();
+      const da = new Date(a.Fecha).getTime();
+      const db = new Date(b.Fecha).getTime();
       return ordenFecha === 'asc' ? da - db : db - da;
     });
 
@@ -84,7 +86,7 @@ const Incidencias = ({ filterTecnico = false }) => {
     setShowExport(false);
     if (incidenciasFiltradas.length === 0) return window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos'}));
     try {
-      await exportGenericPDF(incidenciasFiltradas, 'Reporte de Incidencias', `Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
+      await exportToPDF(incidenciasFiltradas, 'Reporte de Incidencias', `Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch(err) {
       window.dispatchEvent(new CustomEvent('app-error', {detail: err.message || 'Error al exportar'}));
     }
@@ -94,7 +96,7 @@ const Incidencias = ({ filterTecnico = false }) => {
     setShowExport(false);
     if (incidenciasFiltradas.length === 0) return window.dispatchEvent(new CustomEvent('app-error', {detail: 'No hay datos'}));
     try {
-      await exportGenericExcel(incidenciasFiltradas, `Incidencias_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await exportToExcel(incidenciasFiltradas, `Incidencias_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch(err) {
       window.dispatchEvent(new CustomEvent('app-error', {detail: err.message || 'Error al exportar'}));
     }

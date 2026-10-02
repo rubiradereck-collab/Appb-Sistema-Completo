@@ -55,7 +55,11 @@ const IncidentDetail = () => {
         IdEstado: nuevoEstado,
         Observaciones: observaciones
       });
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia actualizada'}));
+      
+        if (Capacitor.isNativePlatform()) {
+          Haptics.impact({ style: ImpactStyle.Medium }).catch(()=>console.log('Haptics failed'));
+        }
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia actualizada'}));
       fetchDetail();
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error al actualizar';
@@ -78,7 +82,11 @@ const IncidentDetail = () => {
             IdTecnicoAsignado: user.IdUsuario,
             IdEstado: 2 // En Proceso
           });
-          window.dispatchEvent(new CustomEvent('app-success', {detail: 'Ticket asignado'}));
+          
+        if (Capacitor.isNativePlatform()) {
+          Haptics.impact({ style: ImpactStyle.Medium }).catch(()=>console.log('Haptics failed'));
+        }
+            window.dispatchEvent(new CustomEvent('app-success', {detail: 'Ticket asignado'}));
           fetchDetail();
         } catch (error) {
           const errorMsg = error.response?.data?.message || 'Error al asignar';

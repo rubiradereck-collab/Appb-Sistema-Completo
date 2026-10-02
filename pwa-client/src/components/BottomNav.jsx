@@ -32,7 +32,7 @@ const BottomNav = () => {
     <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around items-center h-16 px-2">
         {(user.Rol === 'Administrador' || user.Rol === 'Técnico') && (
-          <NavItem to="/" icon={FiHome} label="Inicio" />
+          <NavItem to="/dashboard" icon={FiHome} label="Inicio" />
         )}
         
         {user.Rol === 'Técnico' && (

@@ -54,7 +54,11 @@ const NewIncident = () => {
     setGuardando(true);
     try {
       await api.post('/incidencias', formData);
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia creada con éxito'}));
+      
+        if (Capacitor.isNativePlatform()) {
+          Haptics.impact({ style: ImpactStyle.Medium }).catch(()=>console.log('Haptics failed'));
+        }
+        window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia creada con éxito'}));
       setSuccessMsg(true);
       setTimeout(() => {
         navigate('/incidencias');

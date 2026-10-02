@@ -63,27 +63,34 @@ export const PriorityChip = ({ priority, idPrioridad }) => {
 
 export const IncidentCard = ({ incidencia }) => {
   return (
-    <Link to={`/incidencia/${incidencia.IdIncidencia}`} className="block">
+    <Link to={`/incidencia/${incidencia.NumeroTicket}`} className="block">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-md transition-all p-4 relative">
+        
+        {incidencia.EscaladoSLA && (
+          <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg rounded-tr-xl flex items-center shadow-sm">
+            <FiAlertCircle size={8} className="mr-1" />
+            SLA VENCIDO
+          </div>
+        )}
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-bold text-gray-400 dark:text-gray-500">#{incidencia.IdIncidencia}</span>
-            <StatusChip status={incidencia.Estado} idEstado={incidencia.IdEstado} />
-            <PriorityChip priority={incidencia.Prioridad} idPrioridad={incidencia.IdPrioridad} />
+            <StatusChip status={incidencia.NombreEstado} idEstado={incidencia.IdEstado} />
+            <PriorityChip priority={incidencia.NombrePrioridad} idPrioridad={incidencia.IdPrioridad} />
           </div>
-          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">{timeAgo(incidencia.FechaCreacion)}</span>
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">{timeAgo(incidencia.Fecha)}</span>
         </div>
         
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{incidencia.Asunto}</h3>
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{incidencia.TipoIncidencia}</h3>
         <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{incidencia.Descripcion}</p>
         
         <div className="flex justify-between items-center text-[11px] font-medium text-gray-500 dark:text-gray-400">
           <div className="flex items-center space-x-3">
-            <span>{incidencia.Area}</span>
-            {incidencia.NombreTecnico && (
+            <span>{incidencia.Empleado} • {incidencia.NombreArea}</span>
+            {incidencia.NombreTecnicoAsignado && (
               <span className="flex items-center text-brand-blue dark:text-blue-400 bg-brand-light dark:bg-blue-900/20 px-2 py-0.5 rounded-full">
                 <FiUser size={10} className="mr-1" />
-                {incidencia.NombreTecnico.split(' ')[0]}
+                {incidencia.NombreTecnicoAsignado.split(' ')[0]}
               </span>
             )}
           </div>

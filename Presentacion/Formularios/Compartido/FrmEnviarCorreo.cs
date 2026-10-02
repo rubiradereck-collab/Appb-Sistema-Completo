@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -11,11 +11,30 @@ namespace Presentacion.Formularios.Compartido
         public string Asunto { get { return txtAsunto.Text; } }
         public string Mensaje { get { return txtMensaje.Text; } }
         public bool AdjuntarExcel { get { return chkAdjuntarExcel.Checked; } }
+        public bool EnviarATodos { get { return chkTodos != null && chkTodos.Checked; } }
         public bool ConfirmaEnvio { get; private set; } = false;
+
+        
+        public System.Windows.Forms.CheckBox chkTodos;
+        private void AgregarChkTodos()
+        {
+            chkTodos = new System.Windows.Forms.CheckBox();
+            chkTodos.Text = "Enviar a todo el personal (BCC)";
+            chkTodos.Location = new System.Drawing.Point(20, 275); // Adjust Y based on actual layout
+            chkTodos.AutoSize = true;
+            chkTodos.ForeColor = System.Drawing.Color.Black;
+            chkTodos.CheckedChanged += (s, e) => {
+                txtCorreo.Enabled = !chkTodos.Checked;
+                if(chkTodos.Checked) txtCorreo.Text = "Todos los usuarios activos";
+                else txtCorreo.Text = "";
+            };
+            this.Controls.Add(chkTodos);
+        }
 
         public FrmEnviarCorreo(string correoDefault, string asuntoDefault, bool mostrarOpcionExcel)
         {
             InitializeComponent();
+            AgregarChkTodos();
             Presentacion.TemaModerno.Aplicar(this);
 
             txtCorreo.Text = correoDefault;

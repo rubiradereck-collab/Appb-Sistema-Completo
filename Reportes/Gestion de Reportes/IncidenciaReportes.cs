@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using Entidades.Gestion_de_Entidades;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -79,7 +79,7 @@ namespace Reportes
 
         // ---------- Incidencias ----------
 
-        public static byte[] GenerarPdfListado(List<Incidencia> incidencias, string tituloReporte = "Reporte de Incidencias")
+        public static byte[] GenerarPdfListado(List<Incidencia> incidencias, string tituloReporte = "Reporte de Incidencias", int totalUsuariosActivos = 0, List<Incidencia> incidenciasMesAnterior = null)
         {
             try
             {
@@ -118,11 +118,71 @@ namespace Reportes
                                 foreach (var kv in metricas.PorPrioridad.OrderByDescending(k => k.Value))
                                     TarjetaKpi(kv.Key, kv.Value.ToString(), ColorAcero);
 
+                                if (metricas.AdopcionPorcentaje > 0)
+                                    TarjetaKpi("Adopción Sistema", $"{metricas.AdopcionPorcentaje:0.##}%", metricas.AdopcionPorcentaje >= 80 ? Colors.Green.Medium : Colors.Orange.Medium);
                                 if (metricas.TiempoPromedioResolucionHoras.HasValue)
                                     TarjetaKpi("Tiempo prom. resolución", $"{metricas.TiempoPromedioResolucionHoras.Value:0.#} h", ColorAcero);
                             });
 
-                            col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Table(table =>
+                            
+                            if (incidenciasMesAnterior != null && incidenciasMesAnterior.Count > 0)
+                            {
+                                var metAnt = Reportes.MetricasHelper.Calcular(incidenciasMesAnterior, totalUsuariosActivos);
+                                col.Item().PaddingTop(15).PaddingBottom(5).Text("Comparativo con el Mes Anterior").FontSize(14).FontColor(ColorNavy).SemiBold();
+                                
+                                int resActual = incidencias.Count(i => i.FechaSolucion.HasValue);
+                                int resAnt = incidenciasMesAnterior.Count(i => i.FechaSolucion.HasValue);
+                                
+                                double varTotal = metAnt.Total > 0 ? (metricas.Total - metAnt.Total) * 100.0 / metAnt.Total : 0;
+                                double varRes = resAnt > 0 ? (resActual - resAnt) * 100.0 / resAnt : 0;
+                                double varTiempo = (metAnt.TiempoPromedioResolucionHoras.HasValue && metAnt.TiempoPromedioResolucionHoras.Value > 0 && metricas.TiempoPromedioResolucionHoras.HasValue) 
+                                    ? (metricas.TiempoPromedioResolucionHoras.Value - metAnt.TiempoPromedioResolucionHoras.Value) * 100.0 / metAnt.TiempoPromedioResolucionHoras.Value : 0;
+
+                                col.Item().Grid(g => {
+                                    g.Columns(3);
+                                    g.Spacing(10);
+                                    TarjetaKpi(g.Item(), "Total vs Ant", $"{metricas.Total} ({(varTotal > 0 ? "+" : "")}{varTotal:0.#}%)", varTotal <= 0 ? Colors.Green.Medium : Colors.Red.Medium);
+                                    TarjetaKpi(g.Item(), "Resueltas vs Ant", $"{resActual} ({(varRes > 0 ? "+" : "")}{varRes:0.#}%)", varRes >= 0 ? Colors.Green.Medium : Colors.Red.Medium);
+                                    TarjetaKpi(g.Item(), "Tiempo Prom. vs Ant", metricas.TiempoPromedioResolucionHoras.HasValue ? $"{metricas.TiempoPromedioResolucionHoras.Value:0.#}h ({(varTiempo > 0 ? "+" : "")}{varTiempo:0.#}%)" : "N/A", varTiempo <= 0 ? Colors.Green.Medium : Colors.Red.Medium);
+                                });
+                            }
+
+                            col.Item().PaddingTop(15).PaddingBottom(5).Text("Resumen Estadístico").FontSize(14).FontColor(ColorNavy).SemiBold();
+                            col.Item().Grid(g => {
+                                g.Columns(3);
+                                g.Spacing(10);
+                                
+                                g.Item().Table(t => {
+                                    t.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(1); c.RelativeColumn(2); });
+                                    t.Header(h => { h.Cell().Text("Top Áreas").Bold(); h.Cell().Text("Cant").Bold(); h.Cell().Text("T. Prom").Bold(); });
+                                    foreach (var a in metricas.PorArea.OrderByDescending(x => x.Value).Take(5)) {
+                                        t.Cell().Text(a.Key).FontSize(10); t.Cell().Text(a.Value.ToString()).FontSize(10);
+                                        double prom = metricas.TiempoPromedioResolucionPorArea.ContainsKey(a.Key) ? metricas.TiempoPromedioResolucionPorArea[a.Key] : 0;
+                                        t.Cell().Text($"{prom:0.#}h").FontSize(10);
+                                    }
+                                });
+
+                                g.Item().Table(t => {
+                                    t.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(1); c.RelativeColumn(1); });
+                                    t.Header(h => { h.Cell().Text("Tipos").Bold(); h.Cell().Text("Cant").Bold(); h.Cell().Text("%").Bold(); });
+                                    foreach (var tip in metricas.PorTipo.OrderByDescending(x => x.Value).Take(5)) {
+                                        t.Cell().Text(tip.Key).FontSize(10); t.Cell().Text(tip.Value.ToString()).FontSize(10);
+                                        t.Cell().Text($"{(tip.Value * 100.0 / metricas.Total):0.#}%").FontSize(10);
+                                    }
+                                });
+
+                                g.Item().Table(t => {
+                                    t.ColumnsDefinition(c => { c.RelativeColumn(3); c.RelativeColumn(1); c.RelativeColumn(2); });
+                                    t.Header(h => { h.Cell().Text("Técnicos").Bold(); h.Cell().Text("Cant").Bold(); h.Cell().Text("T. Prom").Bold(); });
+                                    foreach (var tec in metricas.MetricasPorTecnico.OrderByDescending(x => x.Value.Item1).Take(5)) {
+                                        t.Cell().Text(tec.Key).FontSize(10); t.Cell().Text(tec.Value.Item1.ToString()).FontSize(10);
+                                        t.Cell().Text($"{tec.Value.Item2:0.#}h").FontSize(10);
+                                    }
+                                });
+                            });
+
+                            col.Item().PaddingVertical(10);
+col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Table(table =>
                             {
                                 table.ColumnsDefinition(columns =>
                                 {
@@ -316,7 +376,7 @@ namespace Reportes
             }
         }
 
-        public static byte[] GenerarExcelListado(List<Incidencia> incidencias)
+        public static byte[] GenerarExcelListado(List<Incidencia> incidencias, int totalUsuariosActivos = 0, List<Incidencia> incidenciasMesAnterior = null)
         {
             try
             {
@@ -367,7 +427,69 @@ namespace Reportes
                     hoja.SheetView.FreezeRows(1);
                     hoja.RangeUsed().SetAutoFilter();
 
-                    using (var ms = new MemoryStream())
+                    
+                    var stats = workbook.Worksheets.Add("Estadísticas");
+                    var metricas = CalcularMetricas(incidencias, totalUsuariosActivos);
+                    
+                    int fRow = 1;
+                    stats.Cell(fRow, 1).Value = "Resumen de Estadísticas";
+                    stats.Row(fRow).Style.Font.Bold = true;
+                    stats.Row(fRow).Style.Font.FontSize = 14;
+                    fRow += 2;
+
+                    stats.Cell(fRow, 1).Value = "Métrica"; stats.Cell(fRow, 2).Value = "Valor";
+                    stats.Row(fRow).Style.Font.Bold = true;
+                    fRow++;
+                    stats.Cell(fRow, 1).Value = "Total Incidencias"; stats.Cell(fRow, 2).Value = metricas.Total; fRow++;
+                    stats.Cell(fRow, 1).Value = "Tiempo Prom. Resolución (h)"; stats.Cell(fRow, 2).Value = metricas.TiempoPromedioResolucionHoras.HasValue ? Math.Round(metricas.TiempoPromedioResolucionHoras.Value, 2) : 0; fRow++;
+                    stats.Cell(fRow, 1).Value = "Adopción de Sistema (%)"; stats.Cell(fRow, 2).Value = Math.Round(metricas.AdopcionPorcentaje, 2); fRow++;
+                    fRow++;
+
+                    if (incidenciasMesAnterior != null && incidenciasMesAnterior.Count > 0)
+                    {
+                        var metAnt = CalcularMetricas(incidenciasMesAnterior, totalUsuariosActivos);
+                        stats.Cell(fRow, 1).Value = "Comparativo vs Mes Anterior";
+                        stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                        
+                        int resAct = incidencias.Count(i => i.FechaSolucion.HasValue);
+                        int resAnt = incidenciasMesAnterior.Count(i => i.FechaSolucion.HasValue);
+                        
+                        double varTotal = metAnt.Total > 0 ? (metricas.Total - metAnt.Total) * 100.0 / metAnt.Total : 0;
+                        double varRes = resAnt > 0 ? (resAct - resAnt) * 100.0 / resAnt : 0;
+                        double varTiempo = (metAnt.TiempoPromedioResolucionHoras.HasValue && metAnt.TiempoPromedioResolucionHoras.Value > 0 && metricas.TiempoPromedioResolucionHoras.HasValue) ? (metricas.TiempoPromedioResolucionHoras.Value - metAnt.TiempoPromedioResolucionHoras.Value) * 100.0 / metAnt.TiempoPromedioResolucionHoras.Value : 0;
+
+                        stats.Cell(fRow, 1).Value = "Total (Variación %)"; stats.Cell(fRow, 2).Value = Math.Round(varTotal, 2); fRow++;
+                        stats.Cell(fRow, 1).Value = "Resueltas (Variación %)"; stats.Cell(fRow, 2).Value = Math.Round(varRes, 2); fRow++;
+                        stats.Cell(fRow, 1).Value = "Tiempo Prom. (Variación %)"; stats.Cell(fRow, 2).Value = Math.Round(varTiempo, 2); fRow++;
+                        fRow++;
+                    }
+
+                    stats.Cell(fRow, 1).Value = "Top Áreas"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    stats.Cell(fRow, 1).Value = "Área"; stats.Cell(fRow, 2).Value = "Cantidad"; stats.Cell(fRow, 3).Value = "Tiempo Prom. (h)"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    foreach (var a in metricas.PorArea.OrderByDescending(x => x.Value)) {
+                        stats.Cell(fRow, 1).Value = a.Key; stats.Cell(fRow, 2).Value = a.Value;
+                        stats.Cell(fRow, 3).Value = metricas.TiempoPromedioResolucionPorArea.ContainsKey(a.Key) ? Math.Round(metricas.TiempoPromedioResolucionPorArea[a.Key], 2) : 0;
+                        fRow++;
+                    }
+                    fRow++;
+
+                    stats.Cell(fRow, 1).Value = "Tipos Frecuentes"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    stats.Cell(fRow, 1).Value = "Tipo"; stats.Cell(fRow, 2).Value = "Cantidad"; stats.Cell(fRow, 3).Value = "%"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    foreach (var t in metricas.PorTipo.OrderByDescending(x => x.Value)) {
+                        stats.Cell(fRow, 1).Value = t.Key; stats.Cell(fRow, 2).Value = t.Value; stats.Cell(fRow, 3).Value = Math.Round(t.Value * 100.0 / metricas.Total, 2);
+                        fRow++;
+                    }
+                    fRow++;
+
+                    stats.Cell(fRow, 1).Value = "Técnicos"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    stats.Cell(fRow, 1).Value = "Nombre"; stats.Cell(fRow, 2).Value = "Atendidas"; stats.Cell(fRow, 3).Value = "Tiempo Prom. (h)"; stats.Row(fRow).Style.Font.Bold = true; fRow++;
+                    foreach (var t in metricas.MetricasPorTecnico.OrderByDescending(x => x.Value.Item1)) {
+                        stats.Cell(fRow, 1).Value = t.Key; stats.Cell(fRow, 2).Value = t.Value.Item1; stats.Cell(fRow, 3).Value = Math.Round(t.Value.Item2, 2);
+                        fRow++;
+                    }
+                    
+                    stats.Columns().AdjustToContents();
+using (var ms = new MemoryStream())
                     {
                         workbook.SaveAs(ms);
                         return ms.ToArray();
@@ -382,36 +504,12 @@ namespace Reportes
 
         // ---------- Métricas y Filtro (sin cambios) ----------
 
-        public static MetricasIncidencias CalcularMetricas(List<Incidencia> incidencias)
+                public static MetricasIncidencias CalcularMetricas(List<Incidencia> incidencias, int totalUsuariosActivos = 0)
         {
-            try
-            {
-                var metricas = new MetricasIncidencias
-                {
-                    Total = incidencias.Count,
-                    PorEstado = incidencias
-                        .GroupBy(i => i.NombreEstado ?? "Sin estado")
-                        .ToDictionary(g => g.Key, g => g.Count()),
-                    PorPrioridad = incidencias
-                        .GroupBy(i => i.NombrePrioridad ?? "Sin prioridad")
-                        .ToDictionary(g => g.Key, g => g.Count()),
-                    PorArea = incidencias
-                        .GroupBy(i => i.NombreArea ?? "Sin área")
-                        .ToDictionary(g => g.Key, g => g.Count())
-                };
-
-                List<Incidencia> resueltas = incidencias.Where(i => i.FechaSolucion.HasValue).ToList();
-                if (resueltas.Count > 0)
-                {
-                    metricas.TiempoPromedioResolucionHoras = resueltas
-                        .Average(i => (i.FechaSolucion.Value - i.Fecha).TotalHours);
-                }
-
-                return metricas;
-            }
-            catch (Exception ex)
-            {
-                throw new ReportesExcepciones("Error al calcular métricas de incidencias", ex);
+            try {
+                return Reportes.MetricasHelper.Calcular(incidencias, totalUsuariosActivos);
+            } catch(Exception ex) {
+                throw new ReportesExcepciones("Error al calcular", ex);
             }
         }
 
@@ -767,5 +865,13 @@ namespace Reportes
                 throw new ReportesExcepciones("Error al generar el Excel de áreas", ex);
             }
         }
-    }
+    
+        private static void TarjetaKpi(IContainer container, string titulo, string valor, string color)
+        {
+            container.Background(color).Padding(10).Column(col =>
+            {
+                col.Item().Text(titulo).FontSize(10).FontColor(Colors.White);
+                col.Item().Text(valor).FontSize(18).Bold().FontColor(Colors.White);
+            });
+        }}
 }

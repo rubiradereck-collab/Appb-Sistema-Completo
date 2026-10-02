@@ -1,30 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Reportes
 {
     public class MetricasIncidencias
     {
-        private int total;
-        private Dictionary<string, int> porEstado;
-        private Dictionary<string, int> porPrioridad;
-        private Dictionary<string, int> porArea;
-        private double? tiempoPromedioResolucionHoras;
-
-        public MetricasIncidencias()
-        {
-            PorEstado = new Dictionary<string, int>();
-            PorPrioridad = new Dictionary<string, int>();
-            PorArea = new Dictionary<string, int>();
-        }
-
-        public int Total { get => total; set => total = value; }
-        public Dictionary<string, int> PorEstado { get => porEstado; set => porEstado = value; }
-        public Dictionary<string, int> PorPrioridad { get => porPrioridad; set => porPrioridad = value; }
-        public Dictionary<string, int> PorArea { get => porArea; set => porArea = value; }
-        public double? TiempoPromedioResolucionHoras { get => tiempoPromedioResolucionHoras; set => tiempoPromedioResolucionHoras = value; }
+        public int Total { get; set; }
+        public Dictionary<string, int> PorEstado { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> PorPrioridad { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> PorArea { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> PorTipo { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, double> TiempoPromedioResolucionPorArea { get; set; } = new Dictionary<string, double>();
+        public Dictionary<string, Tuple<int, double>> MetricasPorTecnico { get; set; } = new Dictionary<string, Tuple<int, double>>();
+        public double? TiempoPromedioResolucionHoras { get; set; }
+        public double AdopcionPorcentaje { get; set; }
     }
 }

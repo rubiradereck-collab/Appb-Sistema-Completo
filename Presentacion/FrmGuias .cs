@@ -348,6 +348,7 @@ namespace Presentacion
                 string correoDestino = frmEnvio.CorreoDestino;
                 string asunto = frmEnvio.Asunto;
                 string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrarás el catálogo de guías rápidas de solución a problemas frecuentes." : frmEnvio.Mensaje;
+                bool enviarATodos = frmEnvio.EnviarATodos;
 
                 await Task.Run(() =>
                 {
@@ -355,7 +356,44 @@ namespace Presentacion
                     var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
                     adjuntos.Add(new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf"));
 
-                    CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    if (enviarATodos)
+                    {
+                        var usuarios = new Logica.Gestion_de_Logica.UsuarioLN().ShowUsuario();
+                        var correosBcc = usuarios.Where(u => u.Estado && !string.IsNullOrWhiteSpace(u.Correo)).Select(u => u.Correo).ToList();
+
+                        if (correosBcc.Count > 0)
+                        {
+                            DialogResult resp = DialogResult.No;
+                            this.Invoke(new Action(() => {
+                                resp = MessageBox.Show($"Se enviará el correo a {correosBcc.Count} usuarios activos. ¿Desea continuar?", "Confirmación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                            }));
+                            if (resp == DialogResult.Yes)
+                            {
+                                string tempPdf = Path.Combine(Path.GetTempPath(), "GuiasDeAyuda.pdf");
+                                File.WriteAllBytes(tempPdf, pdf);
+                                var adjuntosRutas = new System.Collections.Generic.List<string> { tempPdf };
+
+                                for (int i = 0; i < correosBcc.Count; i += 50)
+                                {
+                                    var lote = correosBcc.Skip(i).Take(50).ToList();
+                                    Logica.Gestion_de_Logica.CorreoService.EnviarCorreoMasivoBcc(lote, asunto, mensaje, adjuntosRutas);
+                                }
+                                
+                                new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
+                                    usuarioActual?.IdUsuario ?? 0,
+                                    usuarioActual != null ? $"{usuarioActual.Nombre} {usuarioActual.Apellido}" : "Desconocido",
+                                    "Enviar correo masivo (Guías)",
+                                    "Guías",
+                                    null,
+                                    $"Enviadas guías a {correosBcc.Count} destinatarios."
+                                );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    }
                 });
 
                 MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);

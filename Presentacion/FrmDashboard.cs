@@ -18,6 +18,7 @@ namespace Presentacion
 {
     public partial class FrmDashboard : Form
     {
+        public System.Windows.Forms.Label lblAdopcionValor;
         private Entidades.Gestion_de_Entidades.Usuario _usuarioActual;
         public FrmDashboard(Entidades.Gestion_de_Entidades.Usuario usuarioActual)
         {
@@ -144,6 +145,12 @@ namespace Presentacion
                 MetricasIncidencias metricas = IncidenciaReportes.CalcularMetricas(incidenciasFiltradas);
 
                 lblTotalValor.Text = metricas.Total.ToString();
+
+                int totalUsuarios = new Logica.Gestion_de_Logica.UsuarioLN().ShowUsuario().Count(u => u.Rol == "Usuario" && u.Estado);
+                int empleadosDistintos = incidenciasFiltradas.Where(i => !string.IsNullOrEmpty(i.Empleado)).Select(i => i.Empleado.Trim().ToLower()).Distinct().Count();
+                double adopcion = totalUsuarios > 0 ? (double)empleadosDistintos / totalUsuarios * 100 : 0;
+                if (this.lblAdopcionValor != null) this.lblAdopcionValor.Text = $"{adopcion:0.##}%";
+
 
                 metricas.PorEstado.TryGetValue("Pendiente", out int totalPendientes);
                 lblPendientesValor.Text = totalPendientes.ToString();

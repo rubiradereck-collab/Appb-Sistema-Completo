@@ -87,6 +87,7 @@
     <Compile Include="Gestion de Reportes\FiltroIncidencias.cs" />
     <Compile Include="Gestion de Reportes\IncidenciaReportes.cs" />
     <Compile Include="Gestion de Reportes\MetricasIncidencias.cs" />
+    <Compile Include="Gestion de Reportes\MetricasHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReportesExcepciones.cs" />
   </ItemGroup>

@@ -129,9 +129,20 @@ namespace Bot
                     .Where(i => i.Fecha.Year == mesAnterior.Year && i.Fecha.Month == mesAnterior.Month)
                     .ToList();
 
+                
+                DateTime mesAnteriorPrevio = mesAnterior.AddMonths(-1);
+                var incidenciasMesAnteriorPrevio = new IncidenciaLN().ShowIncidencia()
+                    .Where(i => i.Fecha.Year == mesAnteriorPrevio.Year && i.Fecha.Month == mesAnteriorPrevio.Month)
+                    .ToList();
+
+                int totalUsuariosActivos = new UsuarioLN().ShowUsuario().Count(u => u.Rol == "Usuario" && u.Estado);
+
                 byte[] pdf = Reportes.IncidenciaReportes.GenerarPdfListado(
                     incidenciasDelMes,
-                    $"Reporte Mensual de Incidencias - {mesAnterior:MMMM yyyy}");
+                    $"Reporte Mensual de Incidencias - {mesAnterior:MMMM yyyy}",
+                    totalUsuariosActivos,
+                    incidenciasMesAnteriorPrevio);
+
 
                 var admins = new UsuarioLN().ShowUsuario()
                     .Where(u => u.Rol == "Administrador" && u.Estado && !string.IsNullOrWhiteSpace(u.Correo))

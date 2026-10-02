@@ -116,6 +116,7 @@ const Guias = () => {
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Llamando a la API...'}));
       await api.post('/reportes/enviar', {
         email: emailModal.correoDestino,
+          sendToAll: emailModal.sendToAll,
         pdfBase64,
         filename: `GuiasDeAyuda_${new Date().toISOString().split('T')[0]}.pdf`
       });

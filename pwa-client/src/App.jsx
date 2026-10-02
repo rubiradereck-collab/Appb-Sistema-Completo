@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { FiAlertCircle } from 'react-icons/fi';
 import Login from './pages/Login';
+import { Configuracion } from './pages/Configuracion';
 import Dashboard from './pages/Dashboard';
 import Incidencias from './pages/Incidencias';
 import IncidentDetail from './pages/IncidentDetail';

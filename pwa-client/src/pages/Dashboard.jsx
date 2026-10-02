@@ -136,7 +136,7 @@ const Dashboard = () => {
     
     try {
       await exportToExcel(incidencias, `Reporte_Incidencias_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.xlsx`);
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Reporte Excel generado y descargado'}));
+      
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.message || 'Error al generar Excel';

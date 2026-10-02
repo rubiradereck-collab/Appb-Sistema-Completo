@@ -19,7 +19,7 @@ const saveNativeFile = async (dataBase64, filename) => {
     } catch (e) {
       console.error(e);
       window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error guardando archivo nativo'}));
-      return false;
+      throw new Error('No se pudo guardar el archivo nativo.');
     }
   }
   return false;

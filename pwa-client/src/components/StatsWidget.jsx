@@ -22,17 +22,17 @@ const StatsWidget = ({ incidencias }) => {
   if (data.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex items-center">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex items-center">
       <div className="flex-1">
-        <h3 className="font-bold text-gray-800 text-lg mb-1">Resumen General</h3>
-        <p className="text-sm text-gray-500 mb-4">Estado actual de los tickets</p>
+        <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg mb-1">Resumen General</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Estado actual de los tickets</p>
         
         <div className="grid grid-cols-2 gap-2">
           {data.map((entry, index) => (
             <div key={entry.name} className="flex items-center text-sm font-medium">
               <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-              <span className="text-gray-600 mr-1">{entry.name}:</span>
-              <span className="text-gray-900">{entry.value}</span>
+              <span className="text-gray-600 dark:text-gray-400 mr-1">{entry.name}:</span>
+              <span className="text-gray-900 dark:text-gray-100">{entry.value}</span>
             </div>
           ))}
         </div>

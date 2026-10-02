@@ -139,7 +139,7 @@ const Guias = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black text-brand-dark tracking-tight">Guías Rápidas</h2>
-              <p className="text-sm text-gray-500 mt-1">Base de conocimiento para problemas comunes</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Base de conocimiento para problemas comunes</p>
             </div>
           </div>
           
@@ -193,30 +193,30 @@ const Guias = () => {
               {/* Header / Triggers */}
               <button 
                 onClick={() => toggleExpand(guia.IdGuia)}
-                className="w-full text-left p-5 flex items-center justify-between hover:bg-gray-50/50 focus:outline-none transition-colors"
+                className="w-full text-left p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900/50 focus:outline-none transition-colors"
               >
                 <div className="flex-1 pr-6">
-                  <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{guia.Titulo}</h3>
-                  <p className="text-sm text-gray-500 line-clamp-1">{guia.Problema}</p>
+                  <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg leading-tight mb-1">{guia.Titulo}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{guia.Problema}</p>
                 </div>
-                <div className={`p-2 rounded-full transition-all duration-300 ${expandedId === guia.IdGuia ? 'bg-brand-blue/10 text-brand-blue rotate-180' : 'bg-gray-100 text-gray-400'}`}>
+                <div className={`p-2 rounded-full transition-all duration-300 ${expandedId === guia.IdGuia ? 'bg-brand-blue/10 text-brand-blue rotate-180' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
                   <FiChevronDown className="text-xl" />
                 </div>
               </button>
 
               {/* Content / Body */}
               <div className={`transition-all duration-500 ease-in-out overflow-hidden ${expandedId === guia.IdGuia ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="px-6 pb-6 pt-2 bg-gradient-to-b from-transparent to-gray-50/50 border-t border-gray-100">
+                <div className="px-6 pb-6 pt-2 bg-gradient-to-b from-transparent to-gray-50/50 border-t border-gray-100 dark:border-gray-700">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                     <div className="relative">
                       <div className="absolute -left-2 top-0 bottom-0 w-1 bg-red-400 rounded-r"></div>
                       <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest pl-2">Problema Reportado</span>
-                      <p className="text-sm text-gray-700 mt-2 p-4 bg-white rounded-xl border border-gray-100 whitespace-pre-wrap shadow-sm">{guia.Problema}</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 whitespace-pre-wrap shadow-sm">{guia.Problema}</p>
                     </div>
                     <div className="relative">
                       <div className="absolute -left-2 top-0 bottom-0 w-1 bg-emerald-400 rounded-r"></div>
                       <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest pl-2">Solución Técnica</span>
-                      <p className="text-sm text-gray-800 mt-2 font-medium bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50 whitespace-pre-wrap shadow-sm">{guia.Solucion}</p>
+                      <p className="text-sm text-gray-800 dark:text-gray-200 mt-2 font-medium bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50 whitespace-pre-wrap shadow-sm">{guia.Solucion}</p>
                     </div>
                   </div>
                   <div className="mt-6 flex justify-end space-x-3">
@@ -231,11 +231,11 @@ const Guias = () => {
               </div>
             </div>
           )) : (
-            <div className="card-modern p-12 text-center border-dashed border-2 border-gray-200 shadow-none">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="card-modern p-12 text-center border-dashed border-2 border-gray-200 dark:border-gray-700 shadow-none">
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FiBook className="text-gray-400 text-2xl" />
               </div>
-              <p className="text-gray-500 font-bold text-lg">No se encontraron guías.</p>
+              <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">No se encontraron guías.</p>
               <p className="text-gray-400 text-sm mt-1">Intenta con otros términos de búsqueda.</p>
             </div>
           )}
@@ -245,14 +245,14 @@ const Guias = () => {
       {/* Modal CRUD Guia */}
       {showModal && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 transform transition-all">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg p-8 transform transition-all">
             <h3 className="text-2xl font-black text-brand-dark mb-6 flex items-center space-x-3">
               <div className="p-2 bg-brand-blue/10 text-brand-blue rounded-xl"><FiBook /></div>
               <span>{isEditing ? 'Editar Guía' : 'Nueva Guía'}</span>
             </h3>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Título</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Título</label>
                 <input 
                   type="text" 
                   value={formData.Titulo} 
@@ -262,7 +262,7 @@ const Guias = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Problema</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Problema</label>
                 <textarea 
                   value={formData.Problema} 
                   onChange={e => setFormData({...formData, Problema: e.target.value})} 
@@ -271,7 +271,7 @@ const Guias = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Solución</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Solución</label>
                 <textarea 
                   value={formData.Solucion} 
                   onChange={e => setFormData({...formData, Solucion: e.target.value})} 
@@ -279,7 +279,7 @@ const Guias = () => {
                   required
                 />
               </div>
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 mt-6">
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 dark:border-gray-700 mt-6">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
                 <button type="submit" className="btn-primary">{isEditing ? 'Actualizar' : 'Guardar'}</button>
               </div>
@@ -291,14 +291,14 @@ const Guias = () => {
       {/* Modal Confirm Delete */}
       {confirmModal.show && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiTrash2 className="text-3xl text-red-500" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Eliminar Guía</h3>
-            <p className="text-gray-500 mb-6">¿Estás seguro de que deseas eliminar esta guía?</p>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Eliminar Guía</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">¿Estás seguro de que deseas eliminar esta guía?</p>
             <div className="flex justify-center space-x-3">
-              <button onClick={() => setConfirmModal({ show: false, id: null })} className="flex-1 px-4 py-2 bg-gray-100 font-bold text-gray-700 rounded-xl hover:bg-gray-200">Cancelar</button>
+              <button onClick={() => setConfirmModal({ show: false, id: null })} className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 font-bold text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200">Cancelar</button>
               <button onClick={confirmDelete} className="flex-1 px-4 py-2 bg-red-500 font-bold text-white rounded-xl hover:bg-red-600">Eliminar</button>
             </div>
           </div>
@@ -308,12 +308,12 @@ const Guias = () => {
       {/* Modal Email */}
       {emailModal.show && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiMail className="text-3xl text-blue-500" />
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Enviar Catálogo de Guías</h3>
-            <p className="text-gray-500 mb-4 text-sm">Ingresa el correo del destinatario:</p>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar Catálogo de Guías</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Ingresa el correo del destinatario:</p>
             <form onSubmit={executeSendEmailList}>
               <input 
                 type="email" 
@@ -324,7 +324,7 @@ const Guias = () => {
                 placeholder="ejemplo@correo.com"
               />
               <div className="flex space-x-3">
-                <button type="button" onClick={() => setEmailModal({ show: false, correoDestino: '' })} className="flex-1 bg-gray-200 text-gray-800 font-bold py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancelar</button>
+                <button type="button" onClick={() => setEmailModal({ show: false, correoDestino: '' })} className="flex-1 bg-gray-200 text-gray-800 dark:text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancelar</button>
                 <button type="submit" className="flex-1 bg-[#2988c9] text-white font-bold py-2 rounded-lg hover:bg-[#162d47] transition-colors">Enviar</button>
               </div>
             </form>

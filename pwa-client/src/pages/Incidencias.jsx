@@ -55,7 +55,7 @@ const Incidencias = ({ filterTecnico = false }) => {
       case 2: return 'bg-blue-400 text-white'; // En Proceso
       case 3: return 'bg-green-500 text-white'; // Resuelto
       case 4: return 'bg-gray-500 text-white'; // Cerrado
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
     }
   };
 
@@ -108,7 +108,7 @@ const Incidencias = ({ filterTecnico = false }) => {
             <h2 className="text-2xl font-black text-brand-dark tracking-tight">
               {filterTecnico ? 'Mis Tickets Asignados' : (user?.Rol === 'Usuario' ? 'Mis Reportes de Incidencias' : 'Gestión de Incidencias')}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {filterTecnico ? 'Tickets que debes resolver' : 'Lista completa de requerimientos y reportes'}
             </p>
           </div>
@@ -130,10 +130,10 @@ const Incidencias = ({ filterTecnico = false }) => {
               <FiDownload className="text-lg" />
             </button>
 
-            <div className="flex items-center bg-white rounded-xl shadow-sm border border-gray-200 p-1.5 focus-within:ring-2 ring-brand-blue transition-all">
+            <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-1.5 focus-within:ring-2 ring-brand-blue transition-all">
               <FiFilter className="text-gray-400 ml-2" />
               <select 
-                className="bg-transparent border-none text-sm outline-none py-1 pl-2 pr-4 text-gray-700 font-bold"
+                className="bg-transparent border-none text-sm outline-none py-1 pl-2 pr-4 text-gray-700 dark:text-gray-300 font-bold"
                 value={estadoFiltro}
                 onChange={(e) => setEstadoFiltro(e.target.value)}
               >
@@ -147,7 +147,7 @@ const Incidencias = ({ filterTecnico = false }) => {
         </div>
 
         {/* Filtros y Búsqueda */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-4">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8 space-y-4">
           <div className="relative">
             <FiSearch className="absolute left-4 top-3.5 text-gray-400 text-xl" />
             <input 
@@ -155,34 +155,34 @@ const Incidencias = ({ filterTecnico = false }) => {
               placeholder="Buscar por ticket, empleado o descripción..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input-modern pl-12 text-lg shadow-none border-gray-200 w-full"
+              className="input-modern pl-12 text-lg shadow-none border-gray-200 dark:border-gray-700 w-full"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Desde</label>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Desde</label>
               <input 
                 type="date" 
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Hasta</label>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Hasta</label>
               <input 
                 type="date" 
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 focus:ring-2 focus:ring-brand-blue outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">Ordenar por</label>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">Ordenar por</label>
               <select 
                 value={ordenFecha}
                 onChange={(e) => setOrdenFecha(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl py-2.5 px-3 font-bold focus:ring-2 focus:ring-brand-blue outline-none"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-3 font-bold focus:ring-2 focus:ring-brand-blue outline-none"
               >
                 <option value="desc">Más recientes primero</option>
                 <option value="asc">Más antiguos primero</option>
@@ -194,11 +194,11 @@ const Incidencias = ({ filterTecnico = false }) => {
         {loading ? (
           <div className="text-center py-12 text-gray-400 font-bold animate-pulse">Cargando incidencias...</div>
         ) : filteredIncidencias.length === 0 ? (
-          <div className="card-modern p-12 text-center border-dashed border-2 border-gray-200 shadow-none">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="card-modern p-12 text-center border-dashed border-2 border-gray-200 dark:border-gray-700 shadow-none">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
               <FiSearch className="text-gray-400 text-2xl" />
             </div>
-            <p className="text-gray-500 font-bold text-lg">No se encontraron incidencias.</p>
+            <p className="text-gray-500 dark:text-gray-400 font-bold text-lg">No se encontraron incidencias.</p>
             <p className="text-gray-400 text-sm mt-1">Prueba cambiando los filtros de búsqueda.</p>
           </div>
         ) : (
@@ -207,10 +207,10 @@ const Incidencias = ({ filterTecnico = false }) => {
               <Link to={`/incidencia/${inc.IdIncidencia}`} key={inc.IdIncidencia} className="card-modern p-5 border-l-4 hover:shadow-lg transition-all hover:-translate-y-1 group" style={{ borderLeftColor: inc.IdPrioridad === 1 ? '#ef4444' : inc.IdPrioridad === 2 ? '#f59e0b' : '#3b82f6' }}>
                 <div className="flex justify-between items-start mb-3">
                   <span className="font-black text-brand-dark group-hover:text-brand-blue transition-colors">{inc.NumeroTicket}</span>
-                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{new Date(inc.Fecha).toLocaleDateString()}</span>
+                  <span className="text-xs font-bold text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">{new Date(inc.Fecha).toLocaleDateString()}</span>
                 </div>
-                <h3 className="font-bold text-gray-800 mb-2 line-clamp-1">{inc.TipoIncidencia}</h3>
-                <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">{inc.Descripcion}</p>
+                <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2 line-clamp-1">{inc.TipoIncidencia}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 leading-relaxed">{inc.Descripcion}</p>
                 
                 <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-50">
                   <div className="flex items-center gap-2">

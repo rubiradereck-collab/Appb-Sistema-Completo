@@ -44,14 +44,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-white dark:bg-gray-800">
       {/* Lado Izquierdo: Branding (Oculto en móviles) */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-dark flex-col justify-center items-center p-12 relative overflow-hidden">
         {/* Fondo decorativo */}
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, #2988c9 0%, transparent 40%), radial-gradient(circle at 80% 70%, #2988c9 0%, transparent 40%)' }}></div>
         
         <div className="w-64 h-64 mb-8 relative z-10">
-          <div className="absolute inset-0 bg-white/5 rounded-full blur-2xl"></div>
+          <div className="absolute inset-0 bg-white dark:bg-gray-800/5 rounded-full blur-2xl"></div>
           <img src="/logo.png" alt="APPB Logo" className="w-full h-full object-contain drop-shadow-2xl relative z-10" />
         </div>
         
@@ -69,12 +69,12 @@ const Login = () => {
       {/* Modal Olvide Contrasena */}
       {showForgotModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative animate-fadeIn">
-            <button onClick={() => setShowForgotModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-md shadow-2xl relative animate-fadeIn">
+            <button onClick={() => setShowForgotModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-300">
               <FiX className="text-2xl" />
             </button>
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Recuperar Contraseña</h3>
-            <p className="text-gray-500 mb-6 text-sm">Ingresa tu correo electrónico registrado y te enviaremos una clave temporal.</p>
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">Recuperar Contraseña</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Ingresa tu correo electrónico registrado y te enviaremos una clave temporal.</p>
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div>
                 <div className="relative">
@@ -82,7 +82,7 @@ const Login = () => {
                     <FiMail className="text-gray-400 text-lg" />
                   </div>
                   <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue text-gray-800"
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue text-gray-800 dark:text-gray-200"
                     placeholder="tu.correo@appb.gob.ec" />
                 </div>
               </div>
@@ -110,13 +110,13 @@ const Login = () => {
             <h1 className="text-3xl font-black text-brand-dark tracking-tight">APPB</h1>
           </div>
 
-          <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">¡Bienvenido de nuevo!</h3>
-            <p className="text-gray-500 mb-8 text-sm">Por favor, ingresa tus credenciales para acceder al panel.</p>
+          <div className="bg-white dark:bg-gray-800 p-8 sm:p-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">¡Bienvenido de nuevo!</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">Por favor, ingresa tus credenciales para acceder al panel.</p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2 ml-1">Usuario</label>
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2 ml-1">Usuario</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <FiUser className="text-gray-400 text-lg" />
@@ -125,14 +125,14 @@ const Login = () => {
                     type="text" 
                     value={username}
                     onChange={e => setUsername(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all text-gray-800"
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all text-gray-800 dark:text-gray-200"
                     placeholder="Escribe tu usuario"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm font-bold mb-2 ml-1">Contraseña</label>
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2 ml-1">Contraseña</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <FiLock className="text-gray-400 text-lg" />
@@ -141,7 +141,7 @@ const Login = () => {
                     type={showPassword ? 'text' : 'password'} 
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all text-gray-800"
+                    className="w-full pl-11 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all text-gray-800 dark:text-gray-200"
                     placeholder="••••••••"
                   />
                   <button 
@@ -157,7 +157,7 @@ const Login = () => {
               <div className="flex items-center justify-between mt-2 px-1">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input type="checkbox" className="w-4 h-4 text-brand-blue rounded border-gray-300 focus:ring-brand-blue" />
-                  <span className="text-sm text-gray-600">Recordarme</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Recordarme</span>
                 </label>
                                 <a href="#" onClick={(e) => { e.preventDefault(); setShowForgotModal(true); setForgotMsg({text:"", type:""}); setForgotEmail(""); }} className="text-sm font-bold text-brand-blue hover:text-brand-hover transition-colors">
                   ¿Olvidaste tu contraseña?

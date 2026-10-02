@@ -65,25 +65,25 @@ const NewIncident = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 pb-10">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 pb-10">
       <Header />
       <main className="p-4 max-w-3xl mx-auto w-full">
         <button onClick={() => navigate(-1)} className="flex items-center text-blue-600 mb-4 py-2 font-medium">
           <FiArrowLeft className="mr-2" /> Volver
         </button>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Reportar Nueva Incidencia</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6">Reportar Nueva Incidencia</h2>
           
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Área</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Área</label>
               <select 
                 name="IdArea"
                 value={formData.IdArea}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Seleccione un área</option>
                 {areas.map(a => (
@@ -93,7 +93,7 @@ const NewIncident = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Reportante (Empleado)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del Reportante (Empleado)</label>
               <input 
                 type="text"
                 name="Empleado"
@@ -101,13 +101,13 @@ const NewIncident = () => {
                 onChange={handleChange}
                 maxLength={150}
                 required
-                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
               />
               {formData.Empleado.length >= 150 && <p className="text-xs text-red-500 mt-1">Límite de 150 caracteres alcanzado.</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Problema</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Problema</label>
               <input 
                 type="text"
                 name="TipoIncidencia"
@@ -116,13 +116,13 @@ const NewIncident = () => {
                 maxLength={100}
                 placeholder="Ej. Problema de red, Software no abre..."
                 required
-                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
               />
               {formData.TipoIncidencia.length >= 100 && <p className="text-xs text-red-500 mt-1">Límite de 100 caracteres alcanzado.</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción Detallada</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción Detallada</label>
               <textarea 
                 name="Descripcion"
                 value={formData.Descripcion}
@@ -130,7 +130,7 @@ const NewIncident = () => {
                 required
                 rows={5}
                 placeholder="Describe el problema con el mayor detalle posible..."
-                className="w-full px-4 py-3 bg-white rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
               />
               {formData.Descripcion.trim().length > 0 && formData.Descripcion.trim().length < 10 && (
                 <p className="text-xs text-red-500 mt-1">Debe ingresar al menos 10 caracteres ({formData.Descripcion.trim().length}/10).</p>
@@ -138,12 +138,12 @@ const NewIncident = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad Sugerida</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prioridad Sugerida</label>
               <select 
                 name="IdPrioridad"
                 value={formData.IdPrioridad}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {prioridades.map(p => (
                   <option key={p.IdPrioridad} value={p.IdPrioridad}>{p.NombrePrioridad}</option>
@@ -155,14 +155,14 @@ const NewIncident = () => {
                 La BD original de WinForms no cuenta con una columna en la tabla Incidencias para guardar fotos.
                 Descomentar esto cuando se añada la columna FotoEvidencia VARBINARY(MAX) al SQL Server.
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Adjuntar Foto del Error</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Adjuntar Foto del Error</label>
               <input 
                 type="file"
                 accept="image/*"
                 capture="environment"
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
-              <p className="text-xs text-gray-500 mt-2">Puedes usar la cámara si estás en el celular.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Puedes usar la cámara si estás en el celular.</p>
             </div>
             */}
 

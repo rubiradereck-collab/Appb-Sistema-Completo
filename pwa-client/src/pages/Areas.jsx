@@ -94,7 +94,7 @@ const Areas = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black text-brand-dark tracking-tight">Catálogo de Áreas</h2>
-              <p className="text-sm text-gray-500 mt-1">Departamentos y secciones de la empresa</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Departamentos y secciones de la empresa</p>
             </div>
           </div>
           
@@ -147,11 +147,11 @@ const Areas = () => {
                     <th className="table-header text-center rounded-tr-2xl">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-white dark:bg-gray-800">
                   {filteredAreas.length > 0 ? filteredAreas.map(a => (
                     <tr key={a.IdArea} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="table-cell font-bold text-gray-400 w-20">#{a.IdArea}</td>
-                      <td className="table-cell text-gray-800 font-bold">{a.NombreArea}</td>
+                      <td className="table-cell text-gray-800 dark:text-gray-200 font-bold">{a.NombreArea}</td>
                       <td className="table-cell text-center w-32">
                         <div className="flex justify-center space-x-1 opacity-100 lg:opacity-50 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openEdit(a)} className="text-brand-blue hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="Editar"><FiEdit2 size={18} /></button>
@@ -161,7 +161,7 @@ const Areas = () => {
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="3" className="p-12 text-center text-gray-400 font-bold bg-gray-50/50">
+                      <td colSpan="3" className="p-12 text-center text-gray-400 font-bold bg-gray-50 dark:bg-gray-900/50">
                         No se encontraron áreas.
                       </td>
                     </tr>
@@ -176,17 +176,17 @@ const Areas = () => {
       {/* Modal Form */}
       {showModal && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 transform transition-all">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 transform transition-all">
             <h3 className="text-2xl font-black text-brand-dark mb-6 flex items-center space-x-3">
               <div className="p-2 bg-brand-blue/10 text-brand-blue rounded-xl"><FiLayers /></div>
               <span>{editingId ? 'Editar Área' : 'Crear Área'}</span>
             </h3>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Nombre del Área</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Nombre del Área</label>
                 <input required type="text" maxLength={100} placeholder="Ej. Sistemas, Contabilidad..." className="input-modern" value={nombreArea} onChange={e => setNombreArea(e.target.value)} />
               </div>
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100 mt-6">
+              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100 dark:border-gray-700 mt-6">
                 <button type="button" onClick={() => { setShowModal(false); setEditingId(null); setNombreArea(''); }} className="btn-secondary">Cancelar</button>
                 <button type="submit" className="btn-primary">Guardar</button>
               </div>
@@ -198,12 +198,12 @@ const Areas = () => {
       {/* Confirm Modal */}
       {confirmModal.show && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
               <FiTrash2 className="text-3xl" />
             </div>
             <h2 className="text-xl font-black text-brand-dark mb-2">{confirmModal.title}</h2>
-            <p className="text-gray-500 mb-6 text-sm">{confirmModal.message}</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">{confirmModal.message}</p>
             <div className="flex justify-center space-x-3">
               <button 
                 onClick={() => setConfirmModal({ show: false })}

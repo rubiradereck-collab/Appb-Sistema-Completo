@@ -225,13 +225,13 @@ const Dashboard = () => {
       
       {emailModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
             <div className="bg-brand-dark p-5 text-white font-bold flex justify-between items-center">
               <span className="flex items-center space-x-2"><FiMail className="text-xl" /><span>Enviar Reporte Mensual</span></span>
-              <button onClick={() => setEmailModal({ show: false, email: '' })} className="text-gray-400 hover:text-white transition-colors bg-white/10 p-1.5 rounded-lg"><FiX /></button>
+              <button onClick={() => setEmailModal({ show: false, email: '' })} className="text-gray-400 hover:text-white transition-colors bg-white dark:bg-gray-800/10 p-1.5 rounded-lg"><FiX /></button>
             </div>
             <div className="p-6">
-              <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Correo de Destino</label>
+              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Correo de Destino</label>
               <input 
                 type="email" 
                 value={emailModal.email} 
@@ -254,12 +254,12 @@ const Dashboard = () => {
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
           <div>
             <h2 className="text-2xl font-black text-brand-dark tracking-tight">Dashboard General</h2>
-            <p className="text-sm text-gray-500">Métricas y resumen del sistema</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Métricas y resumen del sistema</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
             <select 
-              className="bg-white border border-gray-200 text-gray-700 text-sm rounded-xl py-2.5 px-4 shadow-sm outline-none focus:ring-2 focus:ring-brand-blue font-medium"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2.5 px-4 shadow-sm outline-none focus:ring-2 focus:ring-brand-blue font-medium"
               value={periodo}
               onChange={e => setPeriodo(e.target.value)}
             >
@@ -295,7 +295,7 @@ const Dashboard = () => {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-blue/5 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out"></div>
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Total</span>
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</span>
                 <div className="p-2 bg-brand-blue/10 rounded-lg text-brand-blue"><FiList className="text-lg" /></div>
               </div>
               <span className="text-4xl font-black text-brand-dark">{total}</span>
@@ -306,7 +306,7 @@ const Dashboard = () => {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/5 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out"></div>
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Pendientes</span>
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pendientes</span>
                 <div className="p-2 bg-amber-100 rounded-lg text-amber-600"><FiAlertCircle className="text-lg" /></div>
               </div>
               <span className="text-4xl font-black text-amber-500">{pendientes}</span>
@@ -317,7 +317,7 @@ const Dashboard = () => {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out"></div>
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Resueltos</span>
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Resueltos</span>
                 <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><FiCheckSquare className="text-lg" /></div>
               </div>
               <span className="text-4xl font-black text-emerald-500">{resueltos}</span>
@@ -328,7 +328,7 @@ const Dashboard = () => {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out"></div>
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Tiempo Promedio</span>
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tiempo Promedio</span>
                 <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><FiClock className="text-lg" /></div>
               </div>
               <span className="text-4xl font-black text-indigo-500">{tiempoPromedio}</span>
@@ -338,15 +338,15 @@ const Dashboard = () => {
 
         {/* Pestañas y Gráfico */}
         <div className="card-modern mb-8">
-          <div className="flex border-b border-gray-100 overflow-x-auto hide-scrollbar bg-gray-50/50">
+          <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto hide-scrollbar bg-gray-50 dark:bg-gray-900/50">
             {['estado', 'prioridad', 'area', 'tendencia'].map(tab => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)} 
                 className={`px-6 py-4 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
                   activeTab === tab 
-                    ? 'border-brand-blue text-brand-blue bg-white' 
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                    ? 'border-brand-blue text-brand-blue bg-white dark:bg-gray-800' 
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-700'
                 }`}
               >
                 {tab === 'estado' && 'Por Estado'}

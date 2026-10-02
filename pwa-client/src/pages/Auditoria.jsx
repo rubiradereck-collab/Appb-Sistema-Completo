@@ -31,7 +31,7 @@ const Auditoria = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black text-brand-dark tracking-tight">Auditoría del Sistema</h2>
-              <p className="text-sm text-gray-500 mt-1">Registro de actividad y cambios en el sistema</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Registro de actividad y cambios en el sistema</p>
             </div>
           </div>
         </div>
@@ -51,7 +51,7 @@ const Auditoria = () => {
                     <th className="table-header rounded-tr-2xl">Detalles</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-white dark:bg-gray-800">
                   {logs.length > 0 ? logs.map(log => (
                     <tr key={log.IdAuditoria} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="table-cell whitespace-nowrap text-gray-400 font-bold">
@@ -74,16 +74,16 @@ const Auditoria = () => {
                           {log.Accion}
                         </span>
                       </td>
-                      <td className="table-cell text-gray-700 font-medium">
+                      <td className="table-cell text-gray-700 dark:text-gray-300 font-medium">
                         {log.Entidad} {log.EntidadId ? <span className="text-gray-400 text-xs ml-1">#{log.EntidadId}</span> : ''}
                       </td>
-                      <td className="table-cell text-gray-500 max-w-[200px] truncate" title={log.Detalle}>
+                      <td className="table-cell text-gray-500 dark:text-gray-400 max-w-[200px] truncate" title={log.Detalle}>
                         {log.Detalle}
                       </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="5" className="p-12 text-center text-gray-400 font-bold bg-gray-50/50">
+                      <td colSpan="5" className="p-12 text-center text-gray-400 font-bold bg-gray-50 dark:bg-gray-900/50">
                         No hay registros de auditoría.
                       </td>
                     </tr>

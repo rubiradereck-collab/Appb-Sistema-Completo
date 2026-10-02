@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
 
 export const Configuracion = () => {
   const { theme, updateTheme, autoRefresh, updateAutoRefresh, refreshInterval, updateRefreshInterval } = useSettings();
@@ -26,7 +27,9 @@ export const Configuracion = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
+    <div className="min-h-screen bg-brand-light dark:bg-gray-900 pb-20">
+      <Header />
+      <div className="p-4 md:p-8 max-w-3xl mx-auto pb-24">
       <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Configuración</h1>
 
       {/* Sección Apariencia */}
@@ -140,6 +143,7 @@ export const Configuracion = () => {
             Contactar al bot de soporte
           </a>
         </div>
+      </div>
       </div>
     </div>
   );

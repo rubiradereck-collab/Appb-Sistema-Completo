@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-brand-dark: #162d47;
@@ -17,7 +18,7 @@
   }
 
   body {
-    @apply bg-brand-light text-gray-900 antialiased;
+    @apply bg-brand-light dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
@@ -39,27 +40,27 @@
 
 @layer components {
   .glass-panel {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-white/20 dark:border-gray-700/50 shadow-lg;
   }
   .input-modern {
-    @apply w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all;
+    @apply w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition-all dark:text-white placeholder-gray-400 dark:placeholder-gray-500;
   }
   .btn-primary {
     @apply flex items-center justify-center space-x-2 bg-brand-blue text-white font-bold py-2.5 px-4 rounded-xl shadow-md hover:bg-brand-hover hover:shadow-lg transition-all active:scale-95;
   }
   .btn-secondary {
-    @apply flex items-center justify-center space-x-2 bg-white text-gray-700 border border-gray-200 font-bold py-2.5 px-4 rounded-xl hover:bg-gray-50 transition-all active:scale-95;
+    @apply flex items-center justify-center space-x-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-bold py-2.5 px-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all active:scale-95;
   }
   .btn-danger {
-    @apply flex items-center justify-center space-x-2 bg-red-50 text-red-600 font-bold py-2.5 px-4 rounded-xl hover:bg-red-100 transition-all active:scale-95;
+    @apply flex items-center justify-center space-x-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold py-2.5 px-4 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-all active:scale-95;
   }
   .card-modern {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+    @apply bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden;
   }
   .table-header {
-    @apply bg-brand-dark text-white text-xs uppercase tracking-wider font-semibold py-4 px-6 text-left sticky top-0 z-10;
+    @apply bg-brand-dark dark:bg-gray-950 text-white text-xs uppercase tracking-wider font-semibold py-4 px-6 text-left sticky top-0 z-10;
   }
   .table-cell {
-    @apply py-4 px-6 border-b border-gray-100 text-sm align-middle;
+    @apply py-4 px-6 border-b border-gray-100 dark:border-gray-700 text-sm align-middle;
   }
 }

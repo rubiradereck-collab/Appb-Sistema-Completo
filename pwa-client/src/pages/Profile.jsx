@@ -101,7 +101,7 @@ const Profile = () => {
   const defaultAvatar = `https://ui-avatars.com/api/?name=${user?.Nombre}+${user?.Apellido}&background=2988c9&color=fff&size=128`;
 
   return (
-    <div className="flex flex-col h-full relative pb-20 bg-gray-50">
+    <div className="flex flex-col h-full relative pb-20 bg-gray-50 dark:bg-gray-900">
       <Header />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
@@ -110,7 +110,7 @@ const Profile = () => {
         <form onSubmit={handleSave} className="space-y-6">
           
           {/* Foto Profile Section */}
-          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-200 flex flex-col items-center">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-sm shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col items-center">
             <div className="w-32 h-32 bg-gray-200 rounded-full mb-4 overflow-hidden shadow-inner flex items-center justify-center border-4 border-white shadow-lg">
               <img src={photoPreview || defaultAvatar} alt="Profile" className="w-full h-full object-cover" />
             </div>
@@ -138,26 +138,26 @@ const Profile = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-300 mb-1">Nombre</label>
-                  <input type="text" name="Nombre" value={formData.Nombre} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                  <input type="text" name="Nombre" value={formData.Nombre} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-300 mb-1">Apellido</label>
-                  <input type="text" name="Apellido" value={formData.Apellido} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                  <input type="text" name="Apellido" value={formData.Apellido} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-300 mb-1">Correo</label>
-                  <input type="email" name="Correo" value={formData.Correo} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                  <input type="email" name="Correo" value={formData.Correo} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-300 mb-1">Usuario</label>
-                  <input type="text" name="Usuario" value={formData.Usuario} disabled className="w-full px-3 py-2 text-gray-600 bg-gray-200 rounded-sm outline-none cursor-not-allowed" />
+                  <input type="text" name="Usuario" value={formData.Usuario} disabled className="w-full px-3 py-2 text-gray-600 dark:text-gray-400 bg-gray-200 rounded-sm outline-none cursor-not-allowed" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Rol</label>
-                <input type="text" name="Rol" value={formData.Rol} disabled className="w-full px-3 py-2 text-gray-600 bg-gray-200 rounded-sm outline-none cursor-not-allowed" />
+                <input type="text" name="Rol" value={formData.Rol} disabled className="w-full px-3 py-2 text-gray-600 dark:text-gray-400 bg-gray-200 rounded-sm outline-none cursor-not-allowed" />
               </div>
             </div>
           </div>
@@ -171,15 +171,15 @@ const Profile = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Contraseña Actual</label>
-                <input type="password" name="PasswordActual" value={formData.PasswordActual} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                <input type="password" name="PasswordActual" value={formData.PasswordActual} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Nueva Contraseña</label>
-                <input type="password" name="PasswordNueva" value={formData.PasswordNueva} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                <input type="password" name="PasswordNueva" value={formData.PasswordNueva} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-300 mb-1">Confirmar Nueva Contraseña</label>
-                <input type="password" name="PasswordConfirma" value={formData.PasswordConfirma} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 bg-white rounded-sm outline-none" />
+                <input type="password" name="PasswordConfirma" value={formData.PasswordConfirma} onChange={handleChange} className="w-full px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 rounded-sm outline-none" />
               </div>
             </div>
           </div>
@@ -190,16 +190,16 @@ const Profile = () => {
               <h4 className="text-base font-black text-brand-dark flex items-center gap-2">
                 <FiMessageCircle className="text-brand-blue" /> Telegram
               </h4>
-              <p className="text-sm text-gray-500 mt-1">Recibe notificaciones del sistema directamente en tu celular.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Recibe notificaciones del sistema directamente en tu celular.</p>
               
               {!telegramChatId && (
-                <div className="mt-3 p-3 bg-white rounded-xl border border-gray-200 text-xs text-gray-600">
+                <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
                   <p className="font-bold mb-1">Para vincular tu cuenta:</p>
                   <ol className="list-decimal pl-4 space-y-1">
                     <li>Abre Telegram y busca el bot.</li>
                     <li>Envía el siguiente mensaje para registrarte:</li>
                   </ol>
-                  <div className="mt-2 p-2 bg-gray-50 rounded-lg font-mono text-brand-blue font-bold">
+                  <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-lg font-mono text-brand-blue font-bold">
                     /registrar {user?.UsuarioLogin || user?.Usuario} [tu_contraseña]
                   </div>
                 </div>
@@ -231,14 +231,14 @@ const Profile = () => {
       {/* Confirm Modal */}
       {confirmModal.show && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 transition-transform">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl scale-100 transition-transform">
             <div className="p-6 text-center">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">{confirmModal.title}</h2>
-              <p className="text-gray-600 mb-6">{confirmModal.message}</p>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">{confirmModal.title}</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">{confirmModal.message}</p>
               <div className="flex gap-3">
                 <button 
                   onClick={() => setConfirmModal({ show: false })}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors"
+                  className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>

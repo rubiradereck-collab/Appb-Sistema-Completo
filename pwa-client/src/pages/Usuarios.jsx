@@ -127,7 +127,7 @@ const Usuarios = () => {
             </div>
             <div>
               <h2 className="text-2xl font-black text-brand-dark tracking-tight">Gestión de Usuarios</h2>
-              <p className="text-sm text-gray-500 mt-1">Administración de cuentas y permisos</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Administración de cuentas y permisos</p>
             </div>
           </div>
           
@@ -178,7 +178,7 @@ const Usuarios = () => {
                     <th className="table-header text-center rounded-tr-2xl">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-white dark:bg-gray-800">
                   {usuarios.map(u => (
                     <tr key={u.IdUsuario} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="table-cell">
@@ -186,14 +186,14 @@ const Usuarios = () => {
                           <div className="w-8 h-8 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-xs uppercase">
                             {u.Nombre?.charAt(0)}
                           </div>
-                          <span className="font-bold text-gray-800">{u.Nombre} {u.Apellido}</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-200">{u.Nombre} {u.Apellido}</span>
                         </div>
                       </td>
-                      <td className="table-cell text-gray-600 font-medium">{u.Usuario || u.UsuarioLogin}</td>
+                      <td className="table-cell text-gray-600 dark:text-gray-400 font-medium">{u.Usuario || u.UsuarioLogin}</td>
                       <td className="table-cell">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
                           u.Rol === 'Administrador' ? 'bg-purple-100 text-purple-700' :
-                          u.Rol === 'Técnico' ? 'bg-blue-100 text-brand-blue' : 'bg-gray-100 text-gray-700'
+                          u.Rol === 'Técnico' ? 'bg-blue-100 text-brand-blue' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                         }`}>
                           {u.Rol}
                         </span>
@@ -228,7 +228,7 @@ const Usuarios = () => {
       {/* Modal CRUD */}
       {showModal && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 transform transition-all">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-md p-8 transform transition-all">
             <h3 className="text-2xl font-black text-brand-dark mb-6 flex items-center space-x-3">
               <div className="p-2 bg-brand-blue/10 text-brand-blue rounded-xl"><FiUsers /></div>
               <span>{isEditing ? 'Editar Usuario' : 'Crear Usuario'}</span>
@@ -236,33 +236,33 @@ const Usuarios = () => {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Nombre</label>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Nombre</label>
                   <input required type="text" maxLength={50} className="input-modern" value={formData.Nombre} onChange={e => setFormData({...formData, Nombre: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Apellido</label>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Apellido</label>
                   <input required type="text" maxLength={50} className="input-modern" value={formData.Apellido} onChange={e => setFormData({...formData, Apellido: e.target.value})} />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Correo Electrónico</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Correo Electrónico</label>
                 <input required type="email" maxLength={100} className="input-modern" value={formData.Correo} onChange={e => setFormData({...formData, Correo: e.target.value})} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Usuario</label>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Usuario</label>
                   <input required type="text" maxLength={50} className="input-modern" value={formData.UsuarioLogin} onChange={e => setFormData({...formData, UsuarioLogin: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Contraseña</label>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Contraseña</label>
                   <input required={!isEditing} placeholder={isEditing ? "(Sin cambios)" : ""} type="password" className="input-modern" value={formData.Password} onChange={e => setFormData({...formData, Password: e.target.value})} />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">Rol</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Rol</label>
                 <select className="input-modern" value={formData.Rol} onChange={e => setFormData({...formData, Rol: e.target.value})}>
                   <option value="Usuario">Usuario (Empleado)</option>
                   <option value="Técnico">Técnico</option>
@@ -271,13 +271,13 @@ const Usuarios = () => {
               </div>
 
               <div className="pt-2">
-                <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 rounded-lg transition-colors">
                   <input type="checkbox" className="w-5 h-5 text-brand-blue rounded border-gray-300 focus:ring-brand-blue" checked={formData.Estado} onChange={e => setFormData({...formData, Estado: e.target.checked})} />
-                  <span className="text-sm font-bold text-gray-700">Usuario Activo</span>
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Usuario Activo</span>
                 </label>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100 mt-6">
+              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100 dark:border-gray-700 mt-6">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
                 <button type="submit" className="btn-primary">{isEditing ? 'Actualizar' : 'Guardar'}</button>
               </div>
@@ -289,19 +289,19 @@ const Usuarios = () => {
       {/* Modal Password */}
       {passwordModal.show && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
             <div className="bg-brand-dark p-5 text-white font-bold flex items-center justify-between">
               <span>Restablecer Contraseña</span>
               <button onClick={() => setPasswordModal({ show: false, idUsuario: null, nombreUsuario: '', newPassword: '' })} className="text-gray-400 hover:text-white transition-colors"><FiX /></button>
             </div>
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4 font-medium">¿Estás seguro que deseas generar una nueva contraseña temporal para <strong>{passwordModal.nombreUsuario}</strong>?</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-medium">¿Estás seguro que deseas generar una nueva contraseña temporal para <strong>{passwordModal.nombreUsuario}</strong>?</p>
               
               {passwordModal.newPassword ? (
                 <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center">
                   <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-1">Nueva Contraseña</p>
                   <p className="font-mono text-2xl font-black tracking-widest text-emerald-600">{passwordModal.newPassword}</p>
-                  <p className="text-xs text-gray-500 mt-2">Cópiala. El usuario deberá cambiarla al iniciar sesión.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Cópiala. El usuario deberá cambiarla al iniciar sesión.</p>
                 </div>
               ) : (
                 <p className="text-xs text-gray-400 mb-6 bg-amber-50 p-3 rounded-lg border border-amber-100 text-amber-700">La nueva contraseña se autogenerará de forma segura.</p>
@@ -325,12 +325,12 @@ const Usuarios = () => {
       {/* Confirm Modal */}
       {confirmModal.show && (
         <div className="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
               <FiTrash2 className="text-3xl" />
             </div>
             <h3 className="text-xl font-black text-brand-dark mb-2">Eliminar Usuario</h3>
-            <p className="text-gray-500 mb-6 text-sm">¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.</p>
             <div className="flex justify-center space-x-3">
               <button 
                 onClick={() => setConfirmModal({ show: false, idUsuario: null })}

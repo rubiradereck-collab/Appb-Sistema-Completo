@@ -23,7 +23,7 @@ const Header = () => {
         className={`flex items-center space-x-3 px-4 py-3.5 rounded-xl font-bold transition-all duration-200 ${
           isActive 
             ? 'bg-brand-blue/20 text-blue-300 border-l-4 border-brand-blue shadow-sm' 
-            : 'text-gray-300 hover:bg-white/5 hover:text-white border-l-4 border-transparent'
+            : 'text-gray-300 hover:bg-white dark:bg-gray-800/5 hover:text-white border-l-4 border-transparent'
         }`}
       >
         <Icon className={`text-xl ${isActive ? 'text-brand-blue' : ''}`} />
@@ -36,11 +36,11 @@ const Header = () => {
     <>
       <header className="bg-brand-dark text-white p-3 md:p-4 flex justify-between items-center shadow-md sticky top-0 z-40 border-b border-white/5">
         <div className="flex items-center space-x-4">
-          <button onClick={() => setMenuOpen(true)} className="p-2 focus:outline-none hover:bg-white/10 rounded-xl transition-colors">
+          <button onClick={() => setMenuOpen(true)} className="p-2 focus:outline-none hover:bg-white dark:bg-gray-800/10 rounded-xl transition-colors">
             <FiMenu className="text-2xl" />
           </button>
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-white/10 rounded-lg p-1 backdrop-blur-sm hidden sm:block">
+            <div className="w-8 h-8 bg-white dark:bg-gray-800/10 rounded-lg p-1 backdrop-blur-sm hidden sm:block">
               <img src="/logo.png" alt="Logo" className="w-full h-full object-contain drop-shadow-md" />
             </div>
             <span className="font-black text-xl tracking-tight hidden sm:block">APPB</span>
@@ -53,7 +53,7 @@ const Header = () => {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
           
-          <div className="flex items-center space-x-3 bg-white/5 px-3 py-1.5 rounded-full border border-white/10 shadow-sm cursor-pointer hover:bg-white/10 transition-colors" onClick={() => navigate('/perfil')}>
+          <div className="flex items-center space-x-3 bg-white dark:bg-gray-800/5 px-3 py-1.5 rounded-full border border-white/10 shadow-sm cursor-pointer hover:bg-white dark:bg-gray-800/10 transition-colors" onClick={() => navigate('/perfil')}>
             <div className="text-right hidden md:block">
               <p className="text-sm font-bold leading-tight">{user?.Nombre} {user?.Apellido}</p>
               <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">{user?.Rol}</p>
@@ -78,7 +78,7 @@ const Header = () => {
           {/* Menu Header */}
           <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20">
             <div className="flex items-center space-x-3">
-               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg overflow-hidden p-1.5">
+               <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-lg overflow-hidden p-1.5">
                  <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
                </div>
                <div>
@@ -86,7 +86,7 @@ const Header = () => {
                   <p className="text-[10px] text-brand-blue font-bold uppercase tracking-widest">Portal Web</p>
                </div>
             </div>
-            <button onClick={() => setMenuOpen(false)} className="text-gray-400 hover:text-white p-2 bg-white/5 rounded-lg transition-colors">
+            <button onClick={() => setMenuOpen(false)} className="text-gray-400 hover:text-white p-2 bg-white dark:bg-gray-800/5 rounded-lg transition-colors">
               <FiX className="text-xl" />
             </button>
           </div>
@@ -110,7 +110,7 @@ const Header = () => {
               {user?.Rol === 'Administrador' && (
                 <>
                   <div className="mt-8 mb-3 px-4">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Administración</p>
+                    <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Administración</p>
                   </div>
                   <NavLink to="/dashboard" icon={FiActivity} label="Dashboard" />
                   <NavLink to="/usuarios" icon={FiUsers} label="Usuarios" />
@@ -123,7 +123,7 @@ const Header = () => {
 
           {/* Menu Footer */}
           <div className="p-4 border-t border-white/10 bg-black/20 mt-auto">
-            <Link to="/perfil" onClick={() => setMenuOpen(false)} className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-colors mb-2">
+            <Link to="/perfil" onClick={() => setMenuOpen(false)} className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-white dark:bg-gray-800/5 transition-colors mb-2">
               <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-blue border border-white/20">
                 {user?.FotoPerfil ? (
                   <img src={user.FotoPerfil} alt="Perfil" className="w-full h-full object-cover" />

@@ -1,3 +1,4 @@
+using Presentacion.Formularios.Compartido;
 ﻿using Entidades.Gestion_de_Entidades;
 using Logica.Gestion_de_Logica;
 using Reportes;
@@ -34,6 +35,28 @@ namespace Presentacion
         private bool ordenAscendente = true;
         private string columnaOrdenada = null;
 
+        
+        private System.Windows.Forms.Button btnEnviarCorreo;
+        
+        private void AgregarBotonCorreo()
+        {
+            this.btnEnviarCorreo = new System.Windows.Forms.Button();
+            this.btnEnviarCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
+            this.btnEnviarCorreo.FlatAppearance.BorderSize = 0;
+            this.btnEnviarCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnEnviarCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnEnviarCorreo.ForeColor = System.Drawing.Color.White;
+            this.btnEnviarCorreo.Location = new System.Drawing.Point(578, 330);
+            this.btnEnviarCorreo.Name = "btnEnviarCorreo";
+            this.btnEnviarCorreo.Size = new System.Drawing.Size(271, 48);
+            this.btnEnviarCorreo.TabIndex = 23;
+            this.btnEnviarCorreo.Text = "✉ Enviar por Correo";
+            this.btnEnviarCorreo.UseVisualStyleBackColor = false;
+            this.btnEnviarCorreo.Click += new System.EventHandler(this.btnEnviarCorreo_Click);
+            this.panelFormulario.Controls.Add(this.btnEnviarCorreo);
+            this.toolTip1.SetToolTip(this.btnEnviarCorreo, "Enviar reporte por correo electrónico");
+        }
+
         public FrmIncidencias(Usuario usuarioActual)
         {
             InitializeComponent();
@@ -46,6 +69,7 @@ namespace Presentacion
             toolTip1.SetToolTip(btnFiltros, "Filtrar por estado o rango de fechas");
             toolTip1.SetToolTip(txtBusquedaRapida, "Buscar por número de ticket");
             this.usuarioActual = usuarioActual;
+            AgregarBotonCorreo();
             grid.SelectionChanged += grid_SelectionChanged;
             txtBusquedaRapida.TextChanged += txtBusquedaRapida_TextChanged;
             grid.ColumnHeaderMouseClick += grid_ColumnHeaderMouseClick;  
@@ -566,7 +590,7 @@ namespace Presentacion
             frmOpciones.Controls.Add(lbl);
             frmOpciones.Controls.Add(btnListado);
             frmOpciones.Controls.Add(btnDetalle);
-            Presentacion.Estilos.TemaModerno.Aplicar(frmOpciones);
+            Presentacion.TemaModerno.Aplicar(frmOpciones);
             frmOpciones.ShowDialog();
 
             if (opcion == 0) return;
@@ -607,10 +631,12 @@ namespace Presentacion
 
                     CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
                     
-                    AuditoriaService.RegistrarAccion(
+                    /* AuditoriaService.RegistrarAccion */ auditoriaLN.Registrar(
                         usuarioActual.IdUsuario,
+                        $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
                         "Enviar correo",
                         "Incidencia",
+                        null,
                         $"Destinatario: {correoDestino}, Archivos: {adjuntos.Count}"
                     );
                 });

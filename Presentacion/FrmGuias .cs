@@ -1,3 +1,4 @@
+using Presentacion.Formularios.Compartido;
 ﻿using Entidades.Gestion_de_Entidades;
 using Logica.Gestion_de_Logica;
 using Reportes;

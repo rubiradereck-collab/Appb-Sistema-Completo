@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-using Presentacion.Estilos;
+
 
 namespace Presentacion.Formularios.Compartido
 {
@@ -16,7 +16,7 @@ namespace Presentacion.Formularios.Compartido
         public FrmEnviarCorreo(string correoDefault, string asuntoDefault, bool mostrarOpcionExcel)
         {
             InitializeComponent();
-            TemaModerno.Aplicar(this);
+            Presentacion.TemaModerno.Aplicar(this);
 
             txtCorreo.Text = correoDefault;
             txtAsunto.Text = asuntoDefault;

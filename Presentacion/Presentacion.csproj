@@ -104,6 +104,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    
+    <Compile Include="Formularios\Compartido\FrmEnviarCorreo.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Formularios\Compartido\FrmEnviarCorreo.Designer.cs">
+      <DependentUpon>FrmEnviarCorreo.cs</DependentUpon>
+    </Compile>
     <Compile Include="FrmAcercaDe.cs">
       <SubType>Form</SubType>
     </Compile>

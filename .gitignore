@@ -391,3 +391,8 @@ DBIncidencias
 *.exe
 pwa-client/public/descargas/
 api-mock/public-descargas/
+/patch_*.js
+/fix_*.js
+/update*.js
+/package.json
+/package-lock.json

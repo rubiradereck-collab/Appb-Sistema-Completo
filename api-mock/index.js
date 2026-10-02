@@ -82,18 +82,28 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
 
 // Configuración Nodemailer
+let smtpConfigured = false;
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  smtpConfigured = true;
+} else {
+  console.log('SMTP no configurado');
+}
+
 const getTransporter = () => {
+  if (!smtpConfigured) return null;
+  const tlsOptions = {};
+  if (process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'false') {
+     tlsOptions.rejectUnauthorized = false;
+  }
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT || 587,
-    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+    secure: process.env.SMTP_SECURE === "true",
     auth: {
-      user: process.env.SMTP_USER || "test@gmail.com",
-      pass: process.env.SMTP_PASS || "pass123",
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
-    tls: {
-      rejectUnauthorized: false
-    }
+    tls: Object.keys(tlsOptions).length ? tlsOptions : undefined
   });
 };
 
@@ -486,44 +496,43 @@ app.post("/api/usuarios", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
-  try {
-    const { nuevaPassword } = req.body;
-    if (!nuevaPassword) return res.status(400).json({ error: "nuevaPassword es requerida" });
-    const pool = await getSqlServerDb();
-    
-    // Check if user exists to get their email
-    const usrRes = await pool.request()
-      .input("IdUsuario", sql.Int, req.params.id)
-      .query("SELECT Correo FROM Usuarios WHERE IdUsuario = @IdUsuario");
+    try {
+      const pool = await getSqlServerDb();
+      const userRes = await pool.request()
+        .input('Id', require('mssql').Int, req.params.id)
+        .query('SELECT Correo FROM Usuarios WHERE IdUsuario = @Id');
       
-    if (usrRes.recordset.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
-    const userEmail = usrRes.recordset[0].Correo;
-
-    const hash = await bcrypt.hash(nuevaPassword, 10);
-    await pool.request()
-      .input("IdUsuario", sql.Int, req.params.id)
-      .input("Password", sql.VarChar, hash)
-      .query("UPDATE Usuarios SET Password = @Password, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @IdUsuario");
-
-    // Intentar enviar correo (no bloquea si falla, solo loguea)
-    if (userEmail) {
-      try {
-        const transporter = getTransporter();
-      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
-      await transporter.sendMail({
-          from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
-          to: userEmail,
-          subject: "Recuperación de contraseña - Sistema de Incidencias APPB",
-          text: `Hola,\n\nTu contraseña temporal ha sido generada exitosamente.\n\nNueva contraseña: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cámbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
-        });
-      } catch (mailErr) {
-        console.error("No se pudo enviar el correo de reset:", mailErr.message);
+      const userEmail = userRes.recordset[0]?.Correo;
+      const nuevaPassword = Math.random().toString(36).slice(-8);
+      const hash = await require('bcryptjs').hash(nuevaPassword, 10);
+      
+      const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ message: 'Servicio de correo no configurado' });
+  
+      if (userEmail) {
+        try {
+          await transporter.sendMail({
+            from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER}>`,
+            to: userEmail,
+            subject: "Recuperación de contraseña - Sistema de Incidencias APPB",
+            text: `Hola,\n\nTu contraseña temporal ha sido generada exitosamente.\n\nNueva contraseña: ${nuevaPassword}\n\nPor favor, ingresa al sistema y cámbiala lo antes posible.\n\nSaludos,\nSistema de Incidencias APPB`
+          });
+        } catch (mailErr) {
+          console.error("No se pudo enviar el correo de reset:", mailErr.message);
+          return res.status(500).json({ message: 'No se pudo enviar el correo al usuario. No se ha modificado la contraseña.' });
+        }
+      } else {
+          return res.status(400).json({ message: 'El usuario no tiene correo registrado.' });
       }
-    }
 
-    res.json({ success: true, message: "Contraseña actualizada" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+      await pool.request()
+        .input('Id', require('mssql').Int, req.params.id)
+        .input('Hash', require('mssql').VarChar, hash)
+        .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
+  
+      res.json({ success: true, message: "Contraseña actualizada y correo enviado" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
 
 app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
   try {

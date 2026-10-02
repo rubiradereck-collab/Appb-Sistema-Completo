@@ -27,15 +27,27 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
-    // Si el JWT expiró o es inválido
-    if (error.response.status === 401 || error.response.status === 403) {
+    const url = error.config?.url;
+    // (a) No ejecutar esta lógica de redirección para login o recuperar-password
+    if (url && (url.includes('/auth/login') || url.includes('/auth/recuperar-password'))) {
+      return Promise.reject(error);
+    }
+    
+    // (b) Cerrar sesión solo en 401
+    if (error.response.status === 401) {
       localStorage.removeItem('appb_token');
       localStorage.removeItem('appb_user');
-      window.location.href = '/login';
-    }
-
-    // Otros errores del API (400, 500)
-    if (error.response.data && error.response.data.message) {
+      // (d) Redirigir con replace solo si no está ya en /login
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    } 
+    // (c) Ante un 403, solo mostrar toast
+    else if (error.response.status === 403) {
+      window.dispatchEvent(new CustomEvent('app-error', { detail: 'No tienes permiso para realizar esta acción' }));
+    } 
+    // Otros errores del API (400, 500) que no sean auth
+    else if (error.response.data && error.response.data.message) {
       window.dispatchEvent(new CustomEvent('app-error', { detail: error.response.data.message }));
     }
 

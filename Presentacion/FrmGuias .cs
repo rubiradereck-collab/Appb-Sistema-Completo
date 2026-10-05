@@ -1,5 +1,5 @@
 using Presentacion.Formularios.Compartido;
-﻿using Entidades.Gestion_de_Entidades;
+using Entidades.Gestion_de_Entidades;
 using Logica.Gestion_de_Logica;
 using Reportes;
 using System;
@@ -48,7 +48,7 @@ namespace Presentacion
                 button2.Enabled = false; // Guardar
                 button3.Enabled = false; // Eliminar
             }
-        
+
         }
 
         private void CargarGrid()
@@ -262,7 +262,7 @@ namespace Presentacion
                 MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-    
+
 
         private void GuardarArchivo(byte[] contenido, string extension, string filtro)
         {
@@ -335,68 +335,95 @@ namespace Presentacion
         }
         private async void btnEnviarCorreo_Click(object sender, EventArgs e)
         {
-            var frmEnvio = new FrmEnviarCorreo("", "Guías de Ayuda - Sistema de Incidencias APPB", false);
-            frmEnvio.ShowDialog();
+            if (listaGuias == null || listaGuias.Count == 0)
+            {
+                MessageBox.Show("No hay guías para enviar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
+            var frmEnvio = new FrmEnviarCorreo("", "Guías de Ayuda - Sistema de Incidencias APPB", false, true);
+            frmEnvio.ShowDialog();
             if (!frmEnvio.ConfirmaEnvio) return;
+
+            string correoDestino = frmEnvio.CorreoDestino;
+            string asunto = frmEnvio.Asunto;
+            string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje)
+                ? "Adjunto encontrará el catálogo de guías rápidas para solucionar problemas frecuentes."
+                : frmEnvio.Mensaje;
+            bool enviarATodos = frmEnvio.EnviarATodos;
+            var guias = listaGuias.ToList();
+
+            // Destinatarios y confirmación ANTES de generar/enviar (en el hilo de la interfaz)
+            List<string> correosBcc = null;
+            if (enviarATodos)
+            {
+                correosBcc = new UsuarioLN().ShowUsuario()
+                    .Where(u => u.Estado && !string.IsNullOrWhiteSpace(u.Correo) && u.Correo.Contains("@"))
+                    .Select(u => u.Correo.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (correosBcc.Count == 0)
+                {
+                    MessageBox.Show("No hay usuarios activos con correo registrado.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var resp = MessageBox.Show(
+                    $"Se enviarán las guías a {correosBcc.Count} usuario(s) activo(s) en copia oculta.\n\n¿Desea continuar?",
+                    "Confirmar envío masivo", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (resp != DialogResult.Yes) return;
+            }
 
             btnEnviarCorreo.Enabled = false;
             this.Cursor = Cursors.WaitCursor;
 
             try
             {
-                string correoDestino = frmEnvio.CorreoDestino;
-                string asunto = frmEnvio.Asunto;
-                string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrarás el catálogo de guías rápidas de solución a problemas frecuentes." : frmEnvio.Mensaje;
-                bool enviarATodos = frmEnvio.EnviarATodos;
-
                 await Task.Run(() =>
                 {
-                    byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(listaGuias);
-                    var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
-                    adjuntos.Add(new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf"));
+                    byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(guias);
 
                     if (enviarATodos)
                     {
-                        var usuarios = new Logica.Gestion_de_Logica.UsuarioLN().ShowUsuario();
-                        var correosBcc = usuarios.Where(u => u.Estado && !string.IsNullOrWhiteSpace(u.Correo)).Select(u => u.Correo).ToList();
-
-                        if (correosBcc.Count > 0)
+                        string tempPdf = Path.Combine(Path.GetTempPath(), $"GuiasDeAyuda_{Guid.NewGuid():N}.pdf");
+                        File.WriteAllBytes(tempPdf, pdf);
+                        try
                         {
-                            DialogResult resp = DialogResult.No;
-                            this.Invoke(new Action(() => {
-                                resp = MessageBox.Show($"Se enviará el correo a {correosBcc.Count} usuarios activos. ¿Desea continuar?", "Confirmación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                            }));
-                            if (resp == DialogResult.Yes)
+                            var adjuntosRutas = new List<string> { tempPdf };
+                            for (int i = 0; i < correosBcc.Count; i += 50)
                             {
-                                string tempPdf = Path.Combine(Path.GetTempPath(), "GuiasDeAyuda.pdf");
-                                File.WriteAllBytes(tempPdf, pdf);
-                                var adjuntosRutas = new System.Collections.Generic.List<string> { tempPdf };
-
-                                for (int i = 0; i < correosBcc.Count; i += 50)
-                                {
-                                    var lote = correosBcc.Skip(i).Take(50).ToList();
-                                    Logica.Gestion_de_Logica.CorreoService.EnviarCorreoMasivoBcc(lote, asunto, mensaje, adjuntosRutas);
-                                }
-                                
-                                new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
-                                    usuarioActual.IdUsuario,
-                                     $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
-                                    "Enviar correo masivo (Guías)",
-                                    "Guías",
-                                    null,
-                                    $"Enviadas guías a {correosBcc.Count} destinatarios."
-                                );
+                                var lote = correosBcc.Skip(i).Take(50).ToList();
+                                CorreoService.EnviarCorreoMasivoBcc(lote, asunto, mensaje, adjuntosRutas);
                             }
                         }
+                        finally
+                        {
+                            try { File.Delete(tempPdf); } catch { }
+                        }
+
+                        new AuditoriaLN().Registrar(usuarioActual.IdUsuario,
+                            $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
+                            "Enviar correo masivo (Guías)", "Guías", null,
+                            $"Guías enviadas a {correosBcc.Count} destinatarios en BCC.");
                     }
                     else
                     {
+                        var adjuntos = new List<Tuple<byte[], string>>
+                        {
+                            new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf")
+                        };
                         CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+
+                        new AuditoriaLN().Registrar(usuarioActual.IdUsuario,
+                            $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
+                            "Enviar correo (Guías)", "Guías", null,
+                            $"Destinatario: {correoDestino}");
                     }
                 });
 
-                MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string destino = enviarATodos ? $"{correosBcc.Count} usuario(s) activo(s)" : correoDestino;
+                MessageBox.Show($"Guías enviadas correctamente a {destino}.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -410,4 +437,3 @@ namespace Presentacion
         }
     }
 }
-

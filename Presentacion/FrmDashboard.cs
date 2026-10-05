@@ -1,36 +1,45 @@
+using Logica.Gestion_de_Logica;
 using Presentacion.Formularios.Compartido;
-﻿using Logica.Gestion_de_Logica;
 using Reportes;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
-
-
 
 namespace Presentacion
 {
     public partial class FrmDashboard : Form
     {
-        
         private Entidades.Gestion_de_Entidades.Usuario _usuarioActual;
+        private bool _ajustando = false;
+
         public FrmDashboard(Entidades.Gestion_de_Entidades.Usuario usuarioActual)
         {
             InitializeComponent();
             _usuarioActual = usuarioActual;
-            if (this.btnEnviarCorreo != null) this.btnEnviarCorreo.Click += new System.EventHandler(this.btnEnviarCorreo_Click);
+            btnEnviarCorreo.Click += btnEnviarCorreo_Click;
+
             TemaModerno.Aplicar(this);
+
+            // Tarjeta de adopción con el mismo estilo que las demás
+            EstilizarTarjetaAdopcion();
+
+            // Las 5 tarjetas en una fila y el gráfico debajo ocupando el resto
+            flowTarjetas.SetFlowBreak(panelAdopcion, true);
+            flowTarjetas.Resize += (s, e) => AjustarLayout();
+            this.Shown += (s, e) => AjustarLayout();
+
             toolTip1.SetToolTip(btnRefrescar, "Actualizar las métricas y gráficos");
+            toolTip1.SetToolTip(btnEnviarCorreo, "Enviar el reporte del periodo seleccionado por correo");
+
             ConfigurarChart(chartEstado, "Incidencias por Estado", "Estado");
             ConfigurarChart(chartPrioridad, "Incidencias por Prioridad", "Prioridad");
             ConfigurarChart(chartArea, "Incidencias por Área", "Área");
             ConfigurarChart(chartTendencia, "Tendencia de Incidencias por Mes", "Mes");
+
             cboRangoFecha.Items.Clear();
             cboRangoFecha.Items.AddRange(new object[]
             {
@@ -43,7 +52,75 @@ namespace Presentacion
             dtpHasta.Visible = false;
 
             CargarDatos();
+            AjustarLayout();
         }
+
+        // ================== DISEÑO ==================
+
+        private void EstilizarTarjetaAdopcion()
+        {
+            // Copia el estilo de la tarjeta "Total"
+            panelAdopcion.BackColor = panelTotal.BackColor;
+            panelAdopcion.Dock = panelTotal.Dock;
+            panelAdopcion.Size = panelTotal.Size;
+            panelAdopcion.Margin = panelTotal.Margin;
+            panelAdopcion.Padding = panelTotal.Padding;
+
+            // Valor arriba (igual que lblTotalValor)
+            lblAdopcionValor.AutoSize = lblTotalValor.AutoSize;
+            lblAdopcionValor.Dock = lblTotalValor.Dock;
+            lblAdopcionValor.Font = lblTotalValor.Font;
+            lblAdopcionValor.ForeColor = lblTotalValor.ForeColor;
+            lblAdopcionValor.TextAlign = lblTotalValor.TextAlign;
+
+            // Título abajo (igual que lblTotalTitulo)
+            lblAdopcionTitulo.AutoSize = lblTotalTitulo.AutoSize;
+            lblAdopcionTitulo.Dock = lblTotalTitulo.Dock;
+            lblAdopcionTitulo.Font = lblTotalTitulo.Font;
+            lblAdopcionTitulo.ForeColor = lblTotalTitulo.ForeColor;
+            lblAdopcionTitulo.TextAlign = lblTotalTitulo.TextAlign;
+            lblAdopcionTitulo.Text = "👥 Adopción (meta 80%)";
+
+            // Mismo orden de acoplamiento que la tarjeta Total
+            lblAdopcionTitulo.BringToFront();
+
+            // El Designer hace panelAdopcion.SuspendLayout() pero nunca ResumeLayout(),
+            // por eso los labels no se acomodaban. Lo reactivamos aquí.
+            panelAdopcion.ResumeLayout(false);
+            panelAdopcion.PerformLayout();
+        }
+
+        private void AjustarLayout()
+        {
+            if (_ajustando) return;
+            _ajustando = true;
+            try
+            {
+                var tarjetas = new List<Control> { panelTotal, panelPendientes, panelResueltos, panelTiempoPromedio, panelAdopcion }
+                    .Where(c => c.Visible).ToList();
+                if (tarjetas.Count == 0) return;
+
+                int anchoUtil = flowTarjetas.ClientSize.Width - flowTarjetas.Padding.Horizontal;
+                int margenes = tarjetas.Sum(c => c.Margin.Horizontal);
+                int ancho = Math.Max(150, (anchoUtil - margenes - 2) / tarjetas.Count);
+
+                flowTarjetas.SuspendLayout();
+                foreach (var t in tarjetas) t.Width = ancho;
+                TabControl.Width = Math.Max(300, anchoUtil - TabControl.Margin.Horizontal - 2);
+                flowTarjetas.ResumeLayout(true);
+
+                // Alto del gráfico = espacio libre debajo de las tarjetas
+                int finTarjetas = tarjetas.Max(c => c.Bottom + c.Margin.Bottom);
+                int alto = flowTarjetas.ClientSize.Height - flowTarjetas.Padding.Bottom
+                           - finTarjetas - TabControl.Margin.Vertical - 2;
+                TabControl.Height = Math.Max(250, alto);
+            }
+            finally
+            {
+                _ajustando = false;
+            }
+        }
+
         private void ConfigurarChart(Chart chart, string titulo, string tituloEjeX)
         {
             chart.AntiAliasing = AntiAliasingStyles.All;
@@ -78,6 +155,9 @@ namespace Presentacion
 
             chart.Legends.Clear();
         }
+
+        // ================== FILTROS ==================
+
         private void CboRangoFecha_SelectedIndexChanged(object sender, EventArgs e)
         {
             bool esPersonalizado = cboRangoFecha.SelectedItem.ToString() == "Personalizado";
@@ -85,20 +165,18 @@ namespace Presentacion
             dtpHasta.Visible = esPersonalizado;
 
             if (!esPersonalizado)
-            {
                 CargarDatos();
-            }
         }
 
         private void FrmDashboard_Load(object sender, EventArgs e)
         {
-
         }
 
         private void btnRefrescar_Click(object sender, EventArgs e)
         {
             CargarDatos();
         }
+
         private FiltroIncidencias ConstruirFiltroPorRango()
         {
             var filtro = new FiltroIncidencias();
@@ -129,8 +207,22 @@ namespace Presentacion
                 default: // "Todo el histórico"
                     break;
             }
-
             return filtro;
+        }
+
+        private string DescribirPeriodo()
+        {
+            string rango = cboRangoFecha.SelectedItem?.ToString() ?? "Todo el histórico";
+            if (rango == "Personalizado")
+                return $"{dtpDesde.Value:dd/MM/yyyy} - {dtpHasta.Value:dd/MM/yyyy}";
+            return rango;
+        }
+
+        // ================== DATOS ==================
+
+        private int ObtenerTotalUsuariosActivos()
+        {
+            return new UsuarioLN().ShowUsuario().Count(u => u.Rol == "Usuario" && u.Estado);
         }
 
         private void CargarDatos()
@@ -138,19 +230,12 @@ namespace Presentacion
             try
             {
                 var incidencias = new IncidenciaLN().ShowIncidencia();
+                var incidenciasFiltradas = IncidenciaReportes.Filtrar(incidencias, ConstruirFiltroPorRango());
 
-                FiltroIncidencias filtro = ConstruirFiltroPorRango();
-                var incidenciasFiltradas = IncidenciaReportes.Filtrar(incidencias, filtro);
-
-                MetricasIncidencias metricas = IncidenciaReportes.CalcularMetricas(incidenciasFiltradas);
+                int totalUsuarios = ObtenerTotalUsuariosActivos();
+                MetricasIncidencias metricas = IncidenciaReportes.CalcularMetricas(incidenciasFiltradas, totalUsuarios);
 
                 lblTotalValor.Text = metricas.Total.ToString();
-
-                int totalUsuarios = new Logica.Gestion_de_Logica.UsuarioLN().ShowUsuario().Count(u => u.Rol == "Usuario" && u.Estado);
-                int empleadosDistintos = incidenciasFiltradas.Where(i => !string.IsNullOrEmpty(i.Empleado)).Select(i => i.Empleado.Trim().ToLower()).Distinct().Count();
-                double adopcion = totalUsuarios > 0 ? (double)empleadosDistintos / totalUsuarios * 100 : 0;
-                if (this.lblAdopcionValor != null) this.lblAdopcionValor.Text = $"{adopcion:0.##}%";
-
 
                 metricas.PorEstado.TryGetValue("Pendiente", out int totalPendientes);
                 lblPendientesValor.Text = totalPendientes.ToString();
@@ -162,20 +247,36 @@ namespace Presentacion
                     ? $"{metricas.TiempoPromedioResolucionHoras.Value:0.#}h"
                     : "N/A";
 
+                MostrarAdopcion(metricas.AdopcionPorcentaje, totalUsuarios);
+
                 LlenarChart(chartEstado, metricas.PorEstado, ColorPorEstado);
                 LlenarChart(chartPrioridad, metricas.PorPrioridad, ColorPorPrioridad);
-                LlenarChart(chartArea, metricas.PorArea, null); // sin color semántico, todas Azul Acero
-                CargarTendenciaMensual();   // <-- agregar esta línea
+                LlenarChart(chartArea, metricas.PorArea, null);
+                CargarTendenciaMensual(incidencias);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        private void CargarTendenciaMensual()
-        {
-            var todasLasIncidencias = new IncidenciaLN().ShowIncidencia();
 
+        private void MostrarAdopcion(double porcentaje, int totalUsuarios)
+        {
+            if (totalUsuarios == 0)
+            {
+                lblAdopcionValor.Text = "N/A";
+                lblAdopcionValor.ForeColor = Color.FromArgb(170, 180, 190);
+                return;
+            }
+
+            lblAdopcionValor.Text = $"{porcentaje:0}%";
+            lblAdopcionValor.ForeColor = porcentaje >= 80
+                ? Color.FromArgb(46, 204, 113)   // verde: meta cumplida
+                : Color.FromArgb(230, 126, 34);  // naranja: bajo la meta
+        }
+
+        private void CargarTendenciaMensual(List<Entidades.Gestion_de_Entidades.Incidencia> todasLasIncidencias)
+        {
             DateTime inicio = DateTime.Today.AddMonths(-11);
             inicio = new DateTime(inicio.Year, inicio.Month, 1);
 
@@ -224,8 +325,7 @@ namespace Presentacion
                 int indice = serie.Points.AddXY(kvp.Key, kvp.Value);
                 serie.Points[indice].Color = asignarColor != null
                     ? asignarColor(kvp.Key)
-                    : Color.FromArgb(43, 107, 154); // Azul Acero por defecto
-
+                    : Color.FromArgb(43, 107, 154);
             }
 
             chart.Series.Add(serie);
@@ -256,58 +356,73 @@ namespace Presentacion
 
         private void toolTip2_Popup(object sender, PopupEventArgs e)
         {
-
         }
-    
+
+        // ================== CORREO ==================
+
         private async void btnEnviarCorreo_Click(object sender, EventArgs e)
         {
-            var frmEnvio = new FrmEnviarCorreo(_usuarioActual.Correo, "Reporte de Dashboard - Sistema de Incidencias APPB", true);
+            string periodo = DescribirPeriodo();
+            var frmEnvio = new FrmEnviarCorreo(_usuarioActual.Correo,
+                $"Reporte de Incidencias APPB - {periodo}", true);
             frmEnvio.ShowDialog();
-
             if (!frmEnvio.ConfirmaEnvio) return;
+
+            string correoDestino = frmEnvio.CorreoDestino;
+            string asunto = frmEnvio.Asunto;
+            string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje)
+                ? $"Adjunto encontrará el reporte de incidencias ({periodo}) generado desde el Sistema de Incidencias APPB."
+                : frmEnvio.Mensaje;
+            bool adjuntarExcel = frmEnvio.AdjuntarExcel;
+
+            if (string.IsNullOrWhiteSpace(correoDestino))
+            {
+                MessageBox.Show("Ingrese un correo de destino.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // El filtro se lee aquí (hilo de la interfaz), no dentro de Task.Run
+            FiltroIncidencias filtro = ConstruirFiltroPorRango();
 
             btnEnviarCorreo.Enabled = false;
             this.Cursor = Cursors.WaitCursor;
 
             try
             {
-                string correoDestino = frmEnvio.CorreoDestino;
-                string asunto = frmEnvio.Asunto;
-                string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje) ? "Adjunto encontrará el reporte de incidencias generado desde el Sistema de Incidencias APPB." : frmEnvio.Mensaje;
-                bool adjuntarExcel = frmEnvio.AdjuntarExcel;
+                int cantidadAdjuntos = 0;
 
                 await Task.Run(() =>
                 {
-                    var todas = new Logica.Gestion_de_Logica.IncidenciaLN().ShowIncidencia();
-                    var filtro = ConstruirFiltroPorRango();
-                    var filtradas = Reportes.IncidenciaReportes.Filtrar(todas, filtro);
+                    var todas = new IncidenciaLN().ShowIncidencia();
+                    var filtradas = IncidenciaReportes.Filtrar(todas, filtro);
+                    int totalUsuarios = ObtenerTotalUsuariosActivos();
 
-                    var adjuntos = new System.Collections.Generic.List<Tuple<byte[], string>>();
-                    
-                    byte[] pdf = Reportes.IncidenciaReportes.GenerarPdfListado(filtradas, "Reporte de Incidencias - Dashboard");
+                    var adjuntos = new List<Tuple<byte[], string>>();
+
+                    byte[] pdf = IncidenciaReportes.GenerarPdfListado(filtradas,
+                        $"Reporte de Incidencias - {periodo}", totalUsuarios);
                     adjuntos.Add(new Tuple<byte[], string>(pdf, "Reporte_Dashboard.pdf"));
 
                     if (adjuntarExcel)
                     {
-                        byte[] excel = Reportes.IncidenciaReportes.GenerarExcelListado(filtradas);
+                        byte[] excel = IncidenciaReportes.GenerarExcelListado(filtradas, totalUsuarios);
                         adjuntos.Add(new Tuple<byte[], string>(excel, "Reporte_Dashboard.xlsx"));
                     }
 
-                    Logica.Gestion_de_Logica.CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
-                    
-                    // No hay un idUsuario global en FrmDashboard fácilmente accesible (usualmente se pasaría en el constructor),
-                    // usaremos un 0 o null para la auditoría, y "Dashboard" como nombre
-                    new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
+                    CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    cantidadAdjuntos = adjuntos.Count;
+
+                    new AuditoriaLN().Registrar(
                         _usuarioActual.IdUsuario,
                         $"{_usuarioActual.Nombre} {_usuarioActual.Apellido}",
                         "Enviar correo",
                         "Dashboard",
                         null,
-                        $"Destinatario: {correoDestino}, Archivos: {adjuntos.Count}"
-                    );
+                        $"Destinatario: {correoDestino}, Periodo: {periodo}, Archivos: {adjuntos.Count}");
                 });
 
-                MessageBox.Show("Correo enviado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Correo enviado correctamente a {correoDestino} ({cantidadAdjuntos} archivo(s)).",
+                    "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -319,6 +434,5 @@ namespace Presentacion
                 this.Cursor = Cursors.Default;
             }
         }
-}
     }
-
+}

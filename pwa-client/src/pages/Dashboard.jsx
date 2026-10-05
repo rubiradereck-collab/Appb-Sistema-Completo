@@ -6,7 +6,7 @@ import api from '../api';
 import Header from '../components/Header';
 
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { FiRefreshCw, FiList, FiClock, FiCheckSquare, FiAlertCircle, FiDownload, FiMail, FiX } from 'react-icons/fi';
+import { FiRefreshCw, FiList, FiClock, FiCheckSquare, FiAlertCircle, FiDownload, FiMail, FiX, FiUsers } from 'react-icons/fi';
 import { exportToPDF, exportToExcel } from '../utils/exportUtils';
 
 
@@ -33,16 +33,18 @@ const Dashboard = () => {
   const fetchData = async (isAutoRefresh = false) => {
     if (!isAutoRefresh) setLoading(true);
     try {
-      const [incRes, estRes, areaRes, adopcionRes] = await Promise.all([
+      const [incRes, estRes, areaRes] = await Promise.all([
         api.get('/incidencias', isAutoRefresh ? { silent: true } : {}),
         api.get('/estados', isAutoRefresh ? { silent: true } : {}),
-        api.get('/areas', isAutoRefresh ? { silent: true } : {}),
-        api.get('/adopcion', isAutoRefresh ? { silent: true } : {})
+        api.get('/areas', isAutoRefresh ? { silent: true } : {})
       ]);
       setIncidencias(incRes.data);
       setEstados(estRes.data);
       setAreas(areaRes.data);
-      setAdopcion(adopcionRes.data.adopcionPorcentaje);
+      // La adopción va aparte: si falla, el resto del Dashboard sigue funcionando
+      api.get('/adopcion', { silent: true })
+        .then(r => setAdopcion(r.data.adopcionPorcentaje))
+        .catch(() => setAdopcion(null));
     } catch (error) {
       console.error('Error fetching data', error);
     }
@@ -55,7 +57,13 @@ const Dashboard = () => {
   const resueltos = incidencias.filter(i => i.IdEstado === 3).length;
   const cerrados = incidencias.filter(i => i.IdEstado === 4).length;
   
-  const tiempoPromedio = "24h"; 
+  // Tiempo promedio real de atención (desde la creación hasta la solución)
+  const resueltasConFecha = incidencias.filter(i => i.FechaSolucion && i.Fecha);
+  const horasPromedio = resueltasConFecha.length
+    ? resueltasConFecha.reduce((acc, i) => acc + (new Date(i.FechaSolucion) - new Date(i.Fecha)) / 3600000, 0) / resueltasConFecha.length
+    : null;
+  const tiempoPromedio = horasPromedio === null ? '—'
+    : horasPromedio < 24 ? `${horasPromedio.toFixed(1)} h` : `${(horasPromedio / 24).toFixed(1)} d`;
 
   // Datos Gráfico Estado
   const dataEstado = estados.map(est => ({
@@ -262,6 +270,20 @@ const Dashboard = () => {
                 <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><FiClock className="text-lg" /></div>
               </div>
               <span className="text-4xl font-black text-indigo-500">{tiempoPromedio}</span>
+            </div>
+          </div>
+
+          <div className="card-modern p-5 relative overflow-hidden group">
+            <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out ${adopcion !== null && adopcion >= 80 ? 'bg-emerald-500/5' : 'bg-orange-500/5'}`}></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Adopción</span>
+                <div className={`p-2 rounded-lg ${adopcion !== null && adopcion >= 80 ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}><FiUsers className="text-lg" /></div>
+              </div>
+              <span className={`text-4xl font-black ${adopcion === null ? 'text-gray-400' : adopcion >= 80 ? 'text-emerald-500' : 'text-orange-500'}`}>
+                {adopcion === null ? '—' : `${Math.round(adopcion)}%`}
+              </span>
+              <p className="text-xs text-gray-400 mt-1">Meta: 80% del personal</p>
             </div>
           </div>
         </div>

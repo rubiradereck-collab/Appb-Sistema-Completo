@@ -107,7 +107,7 @@ const Guias = () => {
     if (emailModal.sendToAll) {
        try {
          const resp = await api.get('/adopcion');
-         const total = resp.data.totalUsuariosActivos;
+         const total = resp.data.totalDestinatariosCorreo;
          if (!window.confirm(`¿Estás seguro de enviar las guías masivamente a ${total} usuarios activos?`)) return;
        } catch (err) {
          if (!window.confirm('¿Estás seguro de enviar las guías a todo el personal?')) return;
@@ -130,7 +130,7 @@ const Guias = () => {
         filename: `GuiasDeAyuda_${new Date().toISOString().split('T')[0]}.pdf`
       });
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guías enviadas por correo exitosamente'}));
-      setEmailModal({ show: false, correoDestino: '' });
+      setEmailModal({ show: false, correoDestino: '', sendToAll: false });
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error en la petición de correo';
       window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));

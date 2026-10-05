@@ -99,11 +99,20 @@ const Guias = () => {
   };
 
   const handleOpenEmailList = () => {
-    setEmailModal({ show: true, correoDestino: '' });
+    setEmailModal({ show: true, correoDestino: '', sendToAll: false });
   };
 
   const executeSendEmailList = async (e) => {
     e.preventDefault();
+    if (emailModal.sendToAll) {
+       try {
+         const resp = await api.get('/adopcion');
+         const total = resp.data.totalUsuariosActivos;
+         if (!window.confirm(`¿Estás seguro de enviar las guías masivamente a ${total} usuarios activos?`)) return;
+       } catch (err) {
+         if (!window.confirm('¿Estás seguro de enviar las guías a todo el personal?')) return;
+       }
+    }
     window.dispatchEvent(new CustomEvent('app-success', {detail: 'Iniciando envío de Guías...'}));
     try {
       const pdfBase64 = await exportGuiasPDF(
@@ -316,14 +325,27 @@ const Guias = () => {
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar Catálogo de Guías</h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Ingresa el correo del destinatario:</p>
             <form onSubmit={executeSendEmailList}>
-              <input 
-                type="email" 
-                required 
-                className="w-full p-2 border border-gray-300 rounded mb-4 text-center text-lg focus:outline-none focus:border-[#2988c9]" 
-                value={emailModal.correoDestino} 
-                onChange={e => setEmailModal({...emailModal, correoDestino: e.target.value})} 
-                placeholder="ejemplo@correo.com"
-              />
+              <div className="mb-4 text-left">
+                <label className="flex items-center space-x-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+                  <input 
+                    type="checkbox" 
+                    checked={emailModal.sendToAll} 
+                    onChange={e => setEmailModal({...emailModal, sendToAll: e.target.checked})}
+                    className="w-4 h-4 text-brand-blue rounded border-gray-300 focus:ring-brand-blue"
+                  />
+                  <span>Enviar a todo el personal (BCC)</span>
+                </label>
+              </div>
+              {!emailModal.sendToAll && (
+                <input 
+                  type="email" 
+                  required 
+                  className="w-full p-2 border border-gray-300 rounded mb-4 text-center text-lg focus:outline-none focus:border-brand-blue dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                  value={emailModal.correoDestino} 
+                  onChange={e => setEmailModal({...emailModal, correoDestino: e.target.value})} 
+                  placeholder="ejemplo@correo.com"
+                />
+              )}
               <div className="flex space-x-3">
                 <button type="button" onClick={() => setEmailModal({ show: false, correoDestino: '' })} className="flex-1 bg-gray-200 text-gray-800 dark:text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancelar</button>
                 <button type="submit" className="flex-1 bg-[#2988c9] text-white font-bold py-2 rounded-lg hover:bg-[#162d47] transition-colors">Enviar</button>

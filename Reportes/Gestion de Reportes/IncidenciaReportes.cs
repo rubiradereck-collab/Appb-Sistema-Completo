@@ -93,7 +93,7 @@ namespace Reportes
 
                         Encabezado(page, tituloReporte, incidencias.Count);
 
-                        var metricas = CalcularMetricas(incidencias);
+                        var metricas = CalcularMetricas(incidencias, totalUsuariosActivos);
 
                         page.Content().Padding(20).Column(col =>
                         {

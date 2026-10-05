@@ -58,6 +58,9 @@
             this.lblResueltosTitulo = new System.Windows.Forms.Label();
             this.lblResueltosValor = new System.Windows.Forms.Label();
             this.panelTiempoPromedio = new System.Windows.Forms.Panel();
+            this.panelAdopcion = new System.Windows.Forms.Panel();
+            this.lblAdopcionTitulo = new System.Windows.Forms.Label();
+            this.lblAdopcionValor = new System.Windows.Forms.Label();
             this.lblTiempoPromedioTitulo = new System.Windows.Forms.Label();
             this.lblTiempoPromedioValor = new System.Windows.Forms.Label();
             this.TabControl = new System.Windows.Forms.TabControl();
@@ -77,6 +80,7 @@
             this.panelPendientes.SuspendLayout();
             this.panelResueltos.SuspendLayout();
             this.panelTiempoPromedio.SuspendLayout();
+            this.panelAdopcion.SuspendLayout();
             this.TabControl.SuspendLayout();
             this.tabEstado.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.chartEstado)).BeginInit();
@@ -159,6 +163,7 @@
             this.flowTarjetas.Controls.Add(this.panelPendientes);
             this.flowTarjetas.Controls.Add(this.panelResueltos);
             this.flowTarjetas.Controls.Add(this.panelTiempoPromedio);
+            this.flowTarjetas.Controls.Add(this.panelAdopcion);
             this.flowTarjetas.Controls.Add(this.TabControl);
             this.flowTarjetas.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowTarjetas.Location = new System.Drawing.Point(0, 45);
@@ -466,6 +471,41 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(224)))), ((int)(((byte)(224)))));
             this.ClientSize = new System.Drawing.Size(857, 550);
+            
+            // 
+            // panelAdopcion
+            // 
+            this.panelAdopcion.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(204)))), ((int)(((byte)(113)))));
+            this.panelAdopcion.Controls.Add(this.lblAdopcionTitulo);
+            this.panelAdopcion.Controls.Add(this.lblAdopcionValor);
+            this.panelAdopcion.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelAdopcion.Location = new System.Drawing.Point(855, 3);
+            this.panelAdopcion.Name = "panelAdopcion";
+            this.panelAdopcion.Size = new System.Drawing.Size(207, 88);
+            this.panelAdopcion.TabIndex = 4;
+            // 
+            // lblAdopcionTitulo
+            // 
+            this.lblAdopcionTitulo.AutoSize = true;
+            this.lblAdopcionTitulo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblAdopcionTitulo.ForeColor = System.Drawing.Color.White;
+            this.lblAdopcionTitulo.Location = new System.Drawing.Point(14, 14);
+            this.lblAdopcionTitulo.Name = "lblAdopcionTitulo";
+            this.lblAdopcionTitulo.Size = new System.Drawing.Size(124, 16);
+            this.lblAdopcionTitulo.TabIndex = 0;
+            this.lblAdopcionTitulo.Text = "Adopción de Sistema";
+            // 
+            // lblAdopcionValor
+            // 
+            this.lblAdopcionValor.AutoSize = true;
+            this.lblAdopcionValor.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblAdopcionValor.ForeColor = System.Drawing.Color.White;
+            this.lblAdopcionValor.Location = new System.Drawing.Point(14, 38);
+            this.lblAdopcionValor.Name = "lblAdopcionValor";
+            this.lblAdopcionValor.Size = new System.Drawing.Size(55, 37);
+            this.lblAdopcionValor.TabIndex = 1;
+            this.lblAdopcionValor.Text = "0%";
+            
             this.Controls.Add(this.flowTarjetas);
             this.Controls.Add(this.panelToolbar);
             this.ForeColor = System.Drawing.Color.Black;
@@ -505,6 +545,9 @@
         private System.Windows.Forms.Panel panelPendientes;
         private System.Windows.Forms.Panel panelResueltos;
         private System.Windows.Forms.Panel panelTiempoPromedio;
+        private System.Windows.Forms.Panel panelAdopcion;
+        private System.Windows.Forms.Label lblAdopcionTitulo;
+        public System.Windows.Forms.Label lblAdopcionValor;
         private System.Windows.Forms.Label lblTotalTitulo;
         private System.Windows.Forms.Label lblTotalValor;
         private System.Windows.Forms.Label lblPendientesTitulo;

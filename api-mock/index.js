@@ -141,44 +141,887 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
       
       // SEND EMAIL FIRST
       try {
-        let bccList = [];
-      let toEmail = email;
-      let pool = await getSqlServerDb();
-      if (sendToAll) {
-         const result = await pool.request().query("SELECT Correo FROM Usuarios WHERE Rol = 'Usuario' AND Estado = 1");
-         bccList = result.recordset.map(u => u.Correo).filter(c => c);
-         toEmail = process.env.SMTP_USER || "noreply@appb.com";
+        await transporter.sendMail({
+          from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
+          to: Correo,
+          subject: 'Recuperación de Contraseña - APPB',
+          html: `
+            <h3>Hola, ${usuario.Nombre}</h3>
+            <p>Has solicitado restablecer tu contraseña.</p>
+            <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
+            <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+            <br/>
+            <p>Atentamente,<br/>Equipo de Soporte APPB</p>
+          `
+        });
+      } catch (mailErr) {
+        console.error("Error enviando correo de recuperacion:", mailErr.message);
+        return res.status(500).json({ message: "No se pudo enviar el correo con la nueva contraseña. No se han guardado cambios." });
       }
+  
+      // UPDATE ONLY IF MAIL SUCCEEDED
+      await pool.request()
+        .input('Id', sql.Int, usuario.IdUsuario)
+        .input('Hash', sql.VarChar, hash)
+        .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
+  
+      res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Error interno del servidor' });
+    }
+  });
 
-      await transporter.sendMail({
-        from: `"Sistema APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
-        to: toEmail,
-        bcc: bccList,
-        subject: `Reporte de APPB`,
-        text: `Se adjunta el reporte solicitado.`,
-        attachments: [
-          {
-            filename: filename || 'Reporte.pdf',
-            content: pdfBase64.split("base64,")[1] || pdfBase64,
-            encoding: 'base64'
-          }
-        ]
-      });
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("Usuario", sql.VarChar, username)
+      .query("SELECT * FROM Usuarios WHERE Usuario = @Usuario");
       
-      if (sendToAll) {
-         await registrarAuditoria(pool, req, "Enviar correo masivo", "Guias", `Enviadas guias a ${bccList.length} destinatarios`);
+    const user = result.recordset[0];
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Usuario no encontrado" });
+    }
+    if (user.Estado === false) {
+      return res.status(401).json({ success: false, message: "Usuario inactivo" });
+    }
+    
+    if (user.BloqueadoHasta && new Date(user.BloqueadoHasta) > new Date()) {
+      const faltan = Math.ceil((new Date(user.BloqueadoHasta) - new Date()) / 60000);
+        return res.status(401).json({ success: false, message: "Cuenta bloqueada. Intenta de nuevo en " + faltan + " minuto(s)." });
+    }
+
+    const match = await bcrypt.compare(password, user.Password);
+    if (!match) {
+      const intentos = (user.IntentosFallidos || 0) + 1;
+      let bloqueadoHasta = null;
+      if (intentos >= 3) {
+        bloqueadoHasta = new Date(Date.now() + 15 * 60000);
       }
-    res.json({ success: true, message: `Reporte enviado exitosamente a ${email}` });
+      await pool.request()
+        .input("IdUsuario", sql.Int, user.IdUsuario)
+        .input("IntentosFallidos", sql.Int, intentos)
+        .input("BloqueadoHasta", sql.DateTime, bloqueadoHasta)
+        .query("UPDATE Usuarios SET IntentosFallidos = @IntentosFallidos, BloqueadoHasta = @BloqueadoHasta WHERE IdUsuario = @IdUsuario");
+        
+      return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
+    }
+
+    await pool.request()
+      .input("IdUsuario", sql.Int, user.IdUsuario)
+      .query("UPDATE Usuarios SET IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @IdUsuario");
+      
+    const token = jwt.sign(
+      { IdUsuario: user.IdUsuario, Rol: user.Rol },
+      process.env.JWT_SECRET || "super_secret_key_12345",
+      { expiresIn: "8h" }
+    );
+
+    const userSafe = { ...user };
+    delete userSafe.Password;
+    if (userSafe.FotoPerfil && Buffer.isBuffer(userSafe.FotoPerfil)) {
+      userSafe.FotoPerfil = `data:image/jpeg;base64,${userSafe.FotoPerfil.toString('base64')}`;
+    }
+    res.json({ success: true, token, user: userSafe });
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Error interno" });
+  }
+});
+
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  let token = authHeader && authHeader.split(" ")[1];
+  
+  // Soporte para token por query string (ej: para descargas desde el navegador)
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) return res.status(401).json({ message: "Token requerido" });
+
+  jwt.verify(token, process.env.JWT_SECRET || "super_secret_key_12345", (err, decoded) => {
+    if (err) return res.status(401).json({ message: "Token inválido o expirado" });
+    req.user = decoded;
+    next();
+  });
+};;
+app.post('/api/interno/notificar', async (req, res) => {
+  if (!process.env.INTERNAL_API_KEY || req.headers['x-internal-key'] !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+  try {
+    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen } = req.body;
+    const pool = await getSqlServerDb();
+
+    if (tipoEvento === 'nueva') {
+      const mockIncidencia = { 
+        IdIncidencia: idIncidencia, 
+        Empleado: empleado || 'N/A', 
+        TipoIncidencia: tipoIncidencia || 'N/A', 
+        Descripcion: descripcion || '' 
+      };
+      await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio', idTecnicoAsignado);
+    } else if (tipoEvento === 'asignar') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
+    } else if (tipoEvento === 'estado') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'estado', idTecnicoAsignado, nuevoEstado);
+    }
+    
+    return res.status(200).json({ message: 'Notificaciones enviadas' });
+  } catch (err) {
+    console.error('Error interno notificar:', err);
+    return res.status(500).json({ message: 'Error enviando notificaciones' });
+  }
+});
+
+app.use(verifyToken);
+
+app.get("/api/adopcion", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    
+    // Total usuarios activos (Rol Usuario)
+    const resultUsr = await pool.request().query("SELECT Nombre, Apellido FROM Usuarios WHERE Rol = 'Usuario' AND Estado = 1");
+    const totalUsuariosActivos = resultUsr.recordset.length;
+    
+    const validNames = resultUsr.recordset.map(u => (u.Nombre.trim() + " " + u.Apellido.trim()).toLowerCase());
+    
+    // Obtener todas las incidencias (solo las de los Ǹltimos X meses si es necesario, pero como la PWA y FrmDashboard leen de todas o mes actual, hagamos de este mes)
+    // Aqu se pueden tomar los Empleados Ǹnicos que hayan reportado (en Dashboard suele filtrarse por fechas. PWA no filtra fechas para adopcin? Revisemos cmo PWA lo usa)
+    // El PWA calcula en el front o backend? El PWA obtiene adopcionPorcentaje.
+    const resultInc = await pool.request().query("SELECT DISTINCT Empleado FROM Incidencias WHERE Empleado IS NOT NULL AND Empleado != ''");
+    const validReporters = resultInc.recordset.filter(i => validNames.includes(i.Empleado.trim().toLowerCase()));
+    
+    let adopcionPorcentaje = totalUsuariosActivos > 0 ? (validReporters.length / totalUsuariosActivos) * 100 : 0;
+    if (adopcionPorcentaje > 100) adopcionPorcentaje = 100;
+    
+    res.json({ adopcionPorcentaje, totalUsuariosActivos });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+const requireAdmin = (req, res, next) => {
+  if (req.user.Rol !== "Administrador") {
+    return res.status(403).json({ message: "Acceso denegado: Se requiere rol de Administrador" });
+  }
+  next();
+};
+
+async function registrarAuditoria(pool, req, accion, idRef, detalles) {
+  try {
+    await pool.request()
+      .input("IdUsuario", sql.Int, req.user.IdUsuario)
+      .input("FechaHora", sql.DateTime, new Date())
+      .input("Accion", sql.VarChar, accion)
+      .input("TablaReferencia", sql.VarChar, "Incidencias")
+      .input("IdReferencia", sql.Int, idRef)
+      .input("Detalles", sql.VarChar, detalles)
+      .query("INSERT INTO Auditoria (IdUsuario, FechaHora, Accion, TablaReferencia, IdReferencia, Detalles) VALUES (@IdUsuario, @FechaHora, @Accion, @TablaReferencia, @IdReferencia, @Detalles)");
+  } catch (err) {
+    console.error("Error registrando auditoria:", err);
+  }
+}
+
+app.get("/api/areas", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Areas");
+    res.json(result.recordset);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/adopcion", async (req, res) => {
+app.post("/api/areas", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .query("INSERT INTO Areas (NombreArea) OUTPUT INSERTED.IdArea VALUES (@NombreArea)");
+    res.status(201).json({ id: result.recordset[0].IdArea });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/api/areas/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdArea", sql.Int, req.params.id)
+      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .query("UPDATE Areas SET NombreArea = @NombreArea WHERE IdArea = @IdArea");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request().input("IdArea", sql.Int, req.params.id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/prioridades", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/estados", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/guias", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Guias");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/guias/:id/enviar", async (req, res) => {
+  try {
+    const { correoDestino } = req.body;
+    if (!correoDestino) return res.status(400).json({ error: "correoDestino es requerido" });
+    
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
+      
+    if (result.recordset.length === 0) return res.status(404).json({ error: "Guía no encontrada" });
+    const guia = result.recordset[0];
+    
     try {
-      const pool = await getSqlServerDb();
-      const result = await pool.request().query("SELECT COUNT(*) AS Total FROM Usuarios WHERE Rol = 'Usuario' AND Estado = 1");
-      res.json({ totalUsuariosActivos: result.recordset[0].Total || 1 });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+      const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      await transporter.sendMail({
+        from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+        to: correoDestino,
+        subject: `Guías de Ayuda - Sistema de Incidencias APPB`,
+        html: `
+          <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
+          <hr />
+          <h4 style="color: #153250;">Problema:</h4>
+          <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
+          <br/>
+          <h4 style="color: #153250;">Solución recomendada:</h4>
+          <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
+          <hr />
+          <p style="font-size: 12px; color: gray;">Generado por Sistema de Gestión de Incidencias APPB</p>
+        `
+      });
+      res.json({ success: true, message: "Correo enviado exitosamente" });
+    } catch (mailErr) {
+      console.error("Error al enviar guía:", mailErr.message);
+      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuración SMTP." });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/guias", requireAdmin, async (req, res) => {
+  try {
+    const { Titulo, Problema, Solucion } = req.body;
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("Titulo", sql.VarChar, Titulo)
+      .input("Problema", sql.VarChar, Problema)
+      .input("Solucion", sql.VarChar, Solucion)
+      .query("INSERT INTO Guias (Titulo, Problema, Solucion) VALUES (@Titulo, @Problema, @Solucion)");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/api/guias/:id", requireAdmin, async (req, res) => {
+  try {
+    const { Titulo, Problema, Solucion } = req.body;
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .input("Titulo", sql.VarChar, Titulo)
+      .input("Problema", sql.VarChar, Problema)
+      .input("Solucion", sql.VarChar, Solucion)
+      .query("UPDATE Guias SET Titulo = @Titulo, Problema = @Problema, Solucion = @Solucion WHERE IdGuia = @IdGuia");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .query("DELETE FROM Guias WHERE IdGuia = @IdGuia");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/auditoria", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Auditoria ORDER BY Fecha DESC");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
+  try {
+    const { pdfBase64, filename, email, sendToAll } = req.body;
+    if (!pdfBase64) return res.status(400).json({ error: "Falta el PDF" });
+    if (!sendToAll && !email) return res.status(400).json({ error: "Falta el correo destino" });
+    
+    const transporter = getTransporter();
+    if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      
+    const pool = await getSqlServerDb();
+    let bccDestinatarios = [];
+    
+    if (sendToAll) {
+       const uResult = await pool.request().query("SELECT Correo FROM Usuarios WHERE Estado = 1 AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) != ''");
+       bccDestinatarios = uResult.recordset.map(u => u.Correo);
+       if (bccDestinatarios.length === 0) return res.status(400).json({ error: "No hay usuarios activos con correo" });
+       
+       for (let i = 0; i < bccDestinatarios.length; i += 50) {
+          const batch = bccDestinatarios.slice(i, i + 50);
+          await transporter.sendMail({
+            from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+            to: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+            bcc: batch.join(", "),
+            subject: "Catálogo de Guías APPB",
+            text: "Adjunto encontrará el catálogo de guías.",
+            attachments: [{
+                filename: filename || 'Guias.pdf',
+                content: Buffer.from(pdfBase64, 'base64'),
+                contentType: 'application/pdf'
+            }]
+          });
+       }
+       await registrarAuditoria(pool, req, "Enviar Correo", 0, `Se envió ${filename} masivamente a ${bccDestinatarios.length} usuarios`);
+       return res.json({ success: true, message: `Correo enviado a ${bccDestinatarios.length} usuarios.` });
+    } else {
+       await transporter.sendMail({
+          from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+          to: email,
+          subject: "Catálogo de Guías APPB",
+          text: "Adjunto encontrará el catálogo de guías.",
+          attachments: [{
+              filename: filename || 'Guias.pdf',
+              content: Buffer.from(pdfBase64, 'base64'),
+              contentType: 'application/pdf'
+          }]
+       });
+       await registrarAuditoria(pool, req, "Enviar Correo", 0, `Se envió ${filename} a ${email}`);
+       return res.json({ success: true, message: "Correo enviado correctamente." });
+    }
+  } catch (error) {
+    console.error("Error al enviar correo:", error);
+    res.status(500).json({ error: error.message });
+  }
+});;
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const { getSqlServerDb, sql } = require("./db_sqlserver");
+
+const axios = require('axios');
+
+const enviarTelegram = async (chatId, text, reply_markup = null) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return null;
+  try {
+    const payload = { chat_id: chatId, text: text };
+    if (reply_markup) payload.reply_markup = reply_markup;
+    const res = await require('axios').post(`https://api.telegram.org/bot${token}/sendMessage`, payload);
+    return res.data.result.message_id;
+  } catch (err) {
+    console.error('Error al enviar Telegram:', err.message);
+    return null;
+  }
+};
+
+const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil", idTecnicoAsignado = null) => {
+  try {
+    let query = "SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL";
+    const req = pool.request();
+    if (idTecnicoAsignado) {
+       query += " AND IdUsuario = @IdTecnico";
+       req.input('IdTecnico', require('mssql').Int, idTecnicoAsignado);
+    }
+    const tecnicos = await req.query(query);
+    const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const reply_markup = idTecnicoAsignado ? null : { inline_keyboard: [[{ text: "Aceptar ticket", callback_data: `aceptar_${incidencia.IdIncidencia}` }]] };
+    for (const t of tecnicos.recordset) {
+      const messageId = await enviarTelegram(t.TelegramChatId, mensaje, reply_markup);
+      if (messageId && !idTecnicoAsignado) {
+         try {
+           await pool.request()
+              .input('IdIncidencia', require('mssql').Int, incidencia.IdIncidencia)
+              .input('ChatId', require('mssql').BigInt, t.TelegramChatId)
+              .input('MessageId', require('mssql').Int, messageId)
+              .query("INSERT INTO TelegramMensajes (IdIncidencia, ChatId, MessageId) VALUES (@IdIncidencia, @ChatId, @MessageId)");
+         } catch(dbErr) { console.error("DB Insert error TelegramMensajes", dbErr); }
+      }
+    }
+  } catch (err) {
+    console.error('Error al notificar nueva incidencia', err);
+  }
+};
+
+const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecnicoId, nuevoValor) => {
+  try {
+    if (!tecnicoId) return;
+    const userRes = await pool.request().input('Id', require('mssql').Int, tecnicoId).query("SELECT TelegramChatId FROM Usuarios WHERE IdUsuario = @Id");
+    const chatId = userRes.recordset[0]?.TelegramChatId;
+    if (!chatId) return;
+
+    let mensaje = '';
+    if (accion === 'asignar') {
+      mensaje = `ðŸ”” Se te ha asignado la Incidencia #${incidenciaId}`;
+    } else if (accion === 'estado') {
+      mensaje = `â„¹ï¸ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+    }
+    
+    if (mensaje) await enviarTelegram(chatId, mensaje);
+  } catch (err) {
+    console.error('Error al notificar actualizacion', err);
+  }
+};
+
+const app = express();
+app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url);next();});
+app.use(cors());
+  app.use('/descargas', require('express').static(require('path').join(__dirname, 'public-descargas')));
+
+
+app.use(express.json({ limit: "10mb" }));
+
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
+
+// Configuración Nodemailer
+let smtpConfigured = false;
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  smtpConfigured = true;
+} else {
+  console.log('SMTP no configurado');
+}
+
+const getTransporter = () => {
+  if (!smtpConfigured) return null;
+  const tlsOptions = {};
+  if (process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'false') {
+     tlsOptions.rejectUnauthorized = false;
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: Object.keys(tlsOptions).length ? tlsOptions : undefined
   });
+};
+
+app.get("/api/test-db", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT 1 AS TestStatus");
+    res.json({ success: true, message: "Conexión a SQL Server exitosa", data: result.recordset });
+  } catch (err) {
+    console.error("Test DB falló:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/auth/recuperar-password', async (req, res) => {
+    try {
+      const { Correo } = req.body;
+      if (!Correo) return res.status(400).json({ message: 'Correo requerido' });
+      
+      const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ message: 'Servicio de correo no configurado' });
+
+      const pool = await getSqlServerDb();
+      const userRes = await pool.request()
+        .input('Correo', sql.VarChar, Correo)
+        .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = 1');
+  
+      if (userRes.recordset.length === 0) {
+        return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+      }
+  
+      const usuario = userRes.recordset[0];
+      const nuevaClave = Math.random().toString(36).slice(-8); 
+      const hash = await bcrypt.hash(nuevaClave, 10);
+      
+      // SEND EMAIL FIRST
+      try {
+        await transporter.sendMail({
+          from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
+          to: Correo,
+          subject: 'Recuperación de Contraseña - APPB',
+          html: `
+            <h3>Hola, ${usuario.Nombre}</h3>
+            <p>Has solicitado restablecer tu contraseña.</p>
+            <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
+            <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+            <br/>
+            <p>Atentamente,<br/>Equipo de Soporte APPB</p>
+          `
+        });
+      } catch (mailErr) {
+        console.error("Error enviando correo de recuperacion:", mailErr.message);
+        return res.status(500).json({ message: "No se pudo enviar el correo con la nueva contraseña. No se han guardado cambios." });
+      }
+  
+      // UPDATE ONLY IF MAIL SUCCEEDED
+      await pool.request()
+        .input('Id', sql.Int, usuario.IdUsuario)
+        .input('Hash', sql.VarChar, hash)
+        .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
+  
+      res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Error interno del servidor' });
+    }
+  });
+
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("Usuario", sql.VarChar, username)
+      .query("SELECT * FROM Usuarios WHERE Usuario = @Usuario");
+      
+    const user = result.recordset[0];
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Usuario no encontrado" });
+    }
+    if (user.Estado === false) {
+      return res.status(401).json({ success: false, message: "Usuario inactivo" });
+    }
+    
+    if (user.BloqueadoHasta && new Date(user.BloqueadoHasta) > new Date()) {
+      const faltan = Math.ceil((new Date(user.BloqueadoHasta) - new Date()) / 60000);
+        return res.status(401).json({ success: false, message: "Cuenta bloqueada. Intenta de nuevo en " + faltan + " minuto(s)." });
+    }
+
+    const match = await bcrypt.compare(password, user.Password);
+    if (!match) {
+      const intentos = (user.IntentosFallidos || 0) + 1;
+      let bloqueadoHasta = null;
+      if (intentos >= 3) {
+        bloqueadoHasta = new Date(Date.now() + 15 * 60000);
+      }
+      await pool.request()
+        .input("IdUsuario", sql.Int, user.IdUsuario)
+        .input("IntentosFallidos", sql.Int, intentos)
+        .input("BloqueadoHasta", sql.DateTime, bloqueadoHasta)
+        .query("UPDATE Usuarios SET IntentosFallidos = @IntentosFallidos, BloqueadoHasta = @BloqueadoHasta WHERE IdUsuario = @IdUsuario");
+        
+      return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
+    }
+
+    await pool.request()
+      .input("IdUsuario", sql.Int, user.IdUsuario)
+      .query("UPDATE Usuarios SET IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @IdUsuario");
+      
+    const token = jwt.sign(
+      { IdUsuario: user.IdUsuario, Rol: user.Rol },
+      process.env.JWT_SECRET || "super_secret_key_12345",
+      { expiresIn: "8h" }
+    );
+
+    const userSafe = { ...user };
+    delete userSafe.Password;
+    if (userSafe.FotoPerfil && Buffer.isBuffer(userSafe.FotoPerfil)) {
+      userSafe.FotoPerfil = `data:image/jpeg;base64,${userSafe.FotoPerfil.toString('base64')}`;
+    }
+    res.json({ success: true, token, user: userSafe });
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Error interno" });
+  }
+});
+
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  let token = authHeader && authHeader.split(" ")[1];
+  
+  // Soporte para token por query string (ej: para descargas desde el navegador)
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) return res.status(401).json({ message: "Token requerido" });
+
+  jwt.verify(token, process.env.JWT_SECRET || "super_secret_key_12345", (err, decoded) => {
+    if (err) return res.status(401).json({ message: "Token inválido o expirado" });
+    req.user = decoded;
+    next();
+  });
+};;
+app.post('/api/interno/notificar', async (req, res) => {
+  if (!process.env.INTERNAL_API_KEY || req.headers['x-internal-key'] !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+  try {
+    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen } = req.body;
+    const pool = await getSqlServerDb();
+
+    if (tipoEvento === 'nueva') {
+      const mockIncidencia = { 
+        IdIncidencia: idIncidencia, 
+        Empleado: empleado || 'N/A', 
+        TipoIncidencia: tipoIncidencia || 'N/A', 
+        Descripcion: descripcion || '' 
+      };
+      await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio', idTecnicoAsignado);
+    } else if (tipoEvento === 'asignar') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
+    } else if (tipoEvento === 'estado') {
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'estado', idTecnicoAsignado, nuevoEstado);
+    }
+    
+    return res.status(200).json({ message: 'Notificaciones enviadas' });
+  } catch (err) {
+    console.error('Error interno notificar:', err);
+    return res.status(500).json({ message: 'Error enviando notificaciones' });
+  }
+});
+
+app.use(verifyToken);
+
+app.get("/api/adopcion", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    
+    // Total usuarios activos (Rol Usuario)
+    const resultUsr = await pool.request().query("SELECT Nombre, Apellido FROM Usuarios WHERE Rol = 'Usuario' AND Estado = 1");
+    const totalUsuariosActivos = resultUsr.recordset.length;
+    
+    const validNames = resultUsr.recordset.map(u => (u.Nombre.trim() + " " + u.Apellido.trim()).toLowerCase());
+    
+    // Obtener todas las incidencias (solo las de los Ǹltimos X meses si es necesario, pero como la PWA y FrmDashboard leen de todas o mes actual, hagamos de este mes)
+    // Aqu se pueden tomar los Empleados Ǹnicos que hayan reportado (en Dashboard suele filtrarse por fechas. PWA no filtra fechas para adopcin? Revisemos cmo PWA lo usa)
+    // El PWA calcula en el front o backend? El PWA obtiene adopcionPorcentaje.
+    const resultInc = await pool.request().query("SELECT DISTINCT Empleado FROM Incidencias WHERE Empleado IS NOT NULL AND Empleado != ''");
+    const validReporters = resultInc.recordset.filter(i => validNames.includes(i.Empleado.trim().toLowerCase()));
+    
+    let adopcionPorcentaje = totalUsuariosActivos > 0 ? (validReporters.length / totalUsuariosActivos) * 100 : 0;
+    if (adopcionPorcentaje > 100) adopcionPorcentaje = 100;
+    
+    res.json({ adopcionPorcentaje, totalUsuariosActivos });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+const requireAdmin = (req, res, next) => {
+  if (req.user.Rol !== "Administrador") {
+    return res.status(403).json({ message: "Acceso denegado: Se requiere rol de Administrador" });
+  }
+  next();
+};
+
+async function registrarAuditoria(pool, req, accion, idRef, detalles) {
+  try {
+    await pool.request()
+      .input("IdUsuario", sql.Int, req.user.IdUsuario)
+      .input("FechaHora", sql.DateTime, new Date())
+      .input("Accion", sql.VarChar, accion)
+      .input("TablaReferencia", sql.VarChar, "Incidencias")
+      .input("IdReferencia", sql.Int, idRef)
+      .input("Detalles", sql.VarChar, detalles)
+      .query("INSERT INTO Auditoria (IdUsuario, FechaHora, Accion, TablaReferencia, IdReferencia, Detalles) VALUES (@IdUsuario, @FechaHora, @Accion, @TablaReferencia, @IdReferencia, @Detalles)");
+  } catch (err) {
+    console.error("Error registrando auditoria:", err);
+  }
+}
+
+app.get("/api/areas", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Areas");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/areas", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .query("INSERT INTO Areas (NombreArea) OUTPUT INSERTED.IdArea VALUES (@NombreArea)");
+    res.status(201).json({ id: result.recordset[0].IdArea });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/api/areas/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdArea", sql.Int, req.params.id)
+      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .query("UPDATE Areas SET NombreArea = @NombreArea WHERE IdArea = @IdArea");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request().input("IdArea", sql.Int, req.params.id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/prioridades", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/estados", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/guias", async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Guias");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/guias/:id/enviar", async (req, res) => {
+  try {
+    const { correoDestino } = req.body;
+    if (!correoDestino) return res.status(400).json({ error: "correoDestino es requerido" });
+    
+    const pool = await getSqlServerDb();
+    const result = await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
+      
+    if (result.recordset.length === 0) return res.status(404).json({ error: "Guía no encontrada" });
+    const guia = result.recordset[0];
+    
+    try {
+      const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      await transporter.sendMail({
+        from: `"Sistema de Incidencias APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+        to: correoDestino,
+        subject: `Guías de Ayuda - Sistema de Incidencias APPB`,
+        html: `
+          <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
+          <hr />
+          <h4 style="color: #153250;">Problema:</h4>
+          <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
+          <br/>
+          <h4 style="color: #153250;">Solución recomendada:</h4>
+          <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
+          <hr />
+          <p style="font-size: 12px; color: gray;">Generado por Sistema de Gestión de Incidencias APPB</p>
+        `
+      });
+      res.json({ success: true, message: "Correo enviado exitosamente" });
+    } catch (mailErr) {
+      console.error("Error al enviar guía:", mailErr.message);
+      res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuración SMTP." });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/guias", requireAdmin, async (req, res) => {
+  try {
+    const { Titulo, Problema, Solucion } = req.body;
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("Titulo", sql.VarChar, Titulo)
+      .input("Problema", sql.VarChar, Problema)
+      .input("Solucion", sql.VarChar, Solucion)
+      .query("INSERT INTO Guias (Titulo, Problema, Solucion) VALUES (@Titulo, @Problema, @Solucion)");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put("/api/guias/:id", requireAdmin, async (req, res) => {
+  try {
+    const { Titulo, Problema, Solucion } = req.body;
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .input("Titulo", sql.VarChar, Titulo)
+      .input("Problema", sql.VarChar, Problema)
+      .input("Solucion", sql.VarChar, Solucion)
+      .query("UPDATE Guias SET Titulo = @Titulo, Problema = @Problema, Solucion = @Solucion WHERE IdGuia = @IdGuia");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    await pool.request()
+      .input("IdGuia", sql.Int, req.params.id)
+      .query("DELETE FROM Guias WHERE IdGuia = @IdGuia");
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/auditoria", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getSqlServerDb();
+    const result = await pool.request().query("SELECT * FROM Auditoria ORDER BY Fecha DESC");
+    res.json(result.recordset);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
+  try {
+    const { pdfBase64, filename, email } = req.body;
+    if (!pdfBase64) return res.status(400).json({ error: "Falta el PDF" });
+    if (!email) return res.status(400).json({ error: "Falta el correo destino" });
+    
+    const transporter = getTransporter();
+      if (!transporter) return res.status(503).json({ error: 'Servicio de correo no configurado' });
+      await transporter.sendMail({
+      from: `"Sistema APPB" <${process.env.SMTP_USER || "noreply@appb.com"}>`,
+      to: email,
+      subject: `Reporte Manual de Incidencias`,
+      text: `Se adjunta el reporte general de incidencias solicitado desde el Dashboard.`,
+      attachments: [
+        {
+          filename: filename || 'Reporte.pdf',
+          content: pdfBase64.split("base64,")[1] || pdfBase64,
+          encoding: 'base64'
+        }
+      ]
+    });
+    res.json({ success: true, message: `Reporte enviado exitosamente a ${email}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.get("/api/usuarios", requireAdmin, async (req, res) => {
   try {

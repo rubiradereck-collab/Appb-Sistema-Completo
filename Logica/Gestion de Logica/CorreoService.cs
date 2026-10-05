@@ -26,20 +26,20 @@ namespace Logica.Gestion_de_Logica
         {
             string servidor = ConfigurationManager.AppSettings["SmtpServidor"];
             int puerto = int.Parse(ConfigurationManager.AppSettings["SmtpPuerto"]);
-            string correo = ConfigurationManager.AppSettings["SmtpCorreo"];
+            string correo = ConfigurationManager.AppSettings["SmtpUsuario"];
             string password = ConfigurationManager.AppSettings["SmtpPassword"];
-            string alias = ConfigurationManager.AppSettings["SmtpAlias"];
-            bool ssl = bool.Parse(ConfigurationManager.AppSettings["SmtpSsl"]);
+            
+            bool ssl = bool.Parse(ConfigurationManager.AppSettings["SmtpUsarSsl"] ?? "true");
             bool ignorarCertificadoVencido = false;
             bool.TryParse(ConfigurationManager.AppSettings["SmtpIgnorarCertificadoVencido"], out ignorarCertificadoVencido);
 
             using (MailMessage mensaje = new MailMessage())
             {
-                mensaje.From = new MailAddress(correo, alias);
+                mensaje.From = new MailAddress(correo, "Sistema de Incidencias APPB");
                 mensaje.To.Add(destinatario);
                 mensaje.Subject = asunto;
                 mensaje.Body = cuerpo;
-                mensaje.IsBodyHtml = true;
+                
 
                 if (adjuntos != null)
                 {
@@ -71,17 +71,17 @@ namespace Logica.Gestion_de_Logica
 
             string servidor = ConfigurationManager.AppSettings["SmtpServidor"];
             int puerto = int.Parse(ConfigurationManager.AppSettings["SmtpPuerto"]);
-            string correo = ConfigurationManager.AppSettings["SmtpCorreo"];
+            string correo = ConfigurationManager.AppSettings["SmtpUsuario"];
             string password = ConfigurationManager.AppSettings["SmtpPassword"];
-            string alias = ConfigurationManager.AppSettings["SmtpAlias"];
-            bool ssl = bool.Parse(ConfigurationManager.AppSettings["SmtpSsl"]);
+            
+            bool ssl = bool.Parse(ConfigurationManager.AppSettings["SmtpUsarSsl"] ?? "true");
             bool ignorarCertificadoVencido = false;
             bool.TryParse(ConfigurationManager.AppSettings["SmtpIgnorarCertificadoVencido"], out ignorarCertificadoVencido);
 
             using (MailMessage mensaje = new MailMessage())
             {
-                mensaje.From = new MailAddress(correo, alias);
-                mensaje.To.Add(new MailAddress(correo, alias)); 
+                mensaje.From = new MailAddress(correo, "Sistema de Incidencias APPB");
+                mensaje.To.Add(new MailAddress(correo, "Sistema de Incidencias APPB")); 
                 
                 foreach (var bcc in destinatariosBcc)
                 {
@@ -91,7 +91,7 @@ namespace Logica.Gestion_de_Logica
 
                 mensaje.Subject = asunto;
                 mensaje.Body = cuerpo;
-                mensaje.IsBodyHtml = true;
+                
 
                 if (adjuntosRutas != null)
                 {

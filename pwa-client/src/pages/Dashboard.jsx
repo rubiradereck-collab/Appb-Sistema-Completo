@@ -18,7 +18,7 @@ const Dashboard = () => {
   const [incidencias, setIncidencias] = useState([]);
   const [estados, setEstados] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [totalUsuariosActivos, setTotalUsuariosActivos] = useState(0);
+  const [adopcion, setAdopcion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emailModal, setEmailModal] = useState({ show: false, email: '' });
   const [periodo, setPeriodo] = useState('Todo el histórico');
@@ -37,12 +37,12 @@ const Dashboard = () => {
         api.get('/incidencias', isAutoRefresh ? { silent: true } : {}),
         api.get('/estados', isAutoRefresh ? { silent: true } : {}),
         api.get('/areas', isAutoRefresh ? { silent: true } : {}),
-        api.get('/adopcion', isAutoRefresh ? { silent: true } : {}).catch(() => ({ data: { totalUsuariosActivos: 10 } }))
+        api.get('/adopcion', isAutoRefresh ? { silent: true } : {})
       ]);
       setIncidencias(incRes.data);
       setEstados(estRes.data);
       setAreas(areaRes.data);
-      setTotalUsuariosActivos(adopcionRes.data.totalUsuariosActivos);
+      setAdopcion(adopcionRes.data.adopcionPorcentaje);
     } catch (error) {
       console.error('Error fetching data', error);
     }
@@ -54,8 +54,7 @@ const Dashboard = () => {
   const pendientes = incidencias.filter(i => i.IdEstado === 1).length;
   const resueltos = incidencias.filter(i => i.IdEstado === 3).length;
   const cerrados = incidencias.filter(i => i.IdEstado === 4).length;
-  const reportadoresUnicos = new Set(incidencias.filter(i => i.Empleado).map(i => i.Empleado.toLowerCase().trim())).size;
-  const adopcionPorcentaje = totalUsuariosActivos > 0 ? (reportadoresUnicos / totalUsuariosActivos) * 100 : 0;
+  
   const tiempoPromedio = "24h"; 
 
   // Datos Gráfico Estado

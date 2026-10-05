@@ -49,12 +49,20 @@ namespace Reportes
 
             if (totalUsuariosActivos > 0)
             {
+                var usuariosLN = new Logica.Gestion_de_Logica.UsuarioLN();
+                var usuariosList = usuariosLN.ShowUsuario();
+                var usuariosActivos = usuariosList.Where(u => u.Rol == "Usuario" && u.Estado).ToList();
+                var nombresValidos = usuariosActivos.Select(u => (u.Nombre.Trim() + " " + u.Apellido.Trim()).ToLower()).ToList();
+
                 int reportadoresUnicos = incidencias
                     .Where(i => !string.IsNullOrEmpty(i.Empleado))
                     .Select(i => i.Empleado.Trim().ToLower())
+                    .Where(e => nombresValidos.Contains(e))
                     .Distinct()
                     .Count();
-                metricas.AdopcionPorcentaje = (double)reportadoresUnicos / totalUsuariosActivos * 100.0;
+
+                double adop = (double)reportadoresUnicos / totalUsuariosActivos * 100.0;
+                metricas.AdopcionPorcentaje = adop > 100.0 ? 100.0 : adop;
             }
 
             return metricas;

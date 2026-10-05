@@ -380,8 +380,8 @@ namespace Presentacion
                                 }
                                 
                                 new Logica.Gestion_de_Logica.AuditoriaLN().Registrar(
-                                    usuarioActual?.IdUsuario ?? 0,
-                                    usuarioActual != null ? $"{usuarioActual.Nombre} {usuarioActual.Apellido}" : "Desconocido",
+                                    usuarioActual.IdUsuario,
+                                     $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
                                     "Enviar correo masivo (Guías)",
                                     "Guías",
                                     null,

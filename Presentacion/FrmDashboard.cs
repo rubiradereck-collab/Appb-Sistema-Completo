@@ -18,7 +18,7 @@ namespace Presentacion
 {
     public partial class FrmDashboard : Form
     {
-        public System.Windows.Forms.Label lblAdopcionValor;
+        
         private Entidades.Gestion_de_Entidades.Usuario _usuarioActual;
         public FrmDashboard(Entidades.Gestion_de_Entidades.Usuario usuarioActual)
         {

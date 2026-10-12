@@ -112,54 +112,101 @@ namespace Bot
                 Log.Information("El Bot fue detenido de forma segura.");
             }
         }
+        private static readonly System.Globalization.CultureInfo CulturaEs = new System.Globalization.CultureInfo("es-EC");
+
+        // Revisa cada 6 horas. Si el reporte del mes anterior todavía no se ha enviado, lo envía
+        // (sin importar el día): así no se pierde si el bot o el correo fallaron el día 1.
+        // La tabla ReportesMensualesEnviados evita que se envíe dos veces.
         private static void RevisarReporteMensual(object state)
         {
             try
             {
-                bool forzar = ConfigurationManager.AppSettings["ForzarReporteMensual"] == "true";
-                if (DateTime.Now.Day != 1 && !forzar) return;
-
+                DateTime mesAnterior = DateTime.Today.AddMonths(-1);
                 var reporteMensualLN = new ReporteMensualLN();
-                DateTime mesAnterior = DateTime.Now.AddMonths(-1);
 
                 if (reporteMensualLN.YaFueEnviado(mesAnterior.Year, mesAnterior.Month))
                     return;
 
-                var incidenciasDelMes = new IncidenciaLN().ShowIncidencia()
-                    .Where(i => i.Fecha.Year == mesAnterior.Year && i.Fecha.Month == mesAnterior.Month)
+                string nombreMes = CulturaEs.TextInfo.ToTitleCase(mesAnterior.ToString("MMMM yyyy", CulturaEs));
+
+                var admins = new UsuarioLN().ShowUsuario()
+                    .Where(u => u.Rol == "Administrador" && u.Estado && !string.IsNullOrWhiteSpace(u.Correo))
                     .ToList();
 
-                
-                DateTime mesAnteriorPrevio = mesAnterior.AddMonths(-1);
-                var incidenciasMesAnteriorPrevio = new IncidenciaLN().ShowIncidencia()
-                    .Where(i => i.Fecha.Year == mesAnteriorPrevio.Year && i.Fecha.Month == mesAnteriorPrevio.Month)
+                if (admins.Count == 0)
+                {
+                    Log.Warning("Reporte mensual de {Mes}: no hay administradores activos con correo. Se reintentará en 6 horas.", nombreMes);
+                    return;
+                }
+
+                var todas = new IncidenciaLN().ShowIncidencia();
+                DateTime mesPrevio = mesAnterior.AddMonths(-1);
+
+                var incidenciasDelMes = todas
+                    .Where(i => i.Fecha.Year == mesAnterior.Year && i.Fecha.Month == mesAnterior.Month)
+                    .ToList();
+                var incidenciasMesPrevio = todas
+                    .Where(i => i.Fecha.Year == mesPrevio.Year && i.Fecha.Month == mesPrevio.Month)
                     .ToList();
 
                 int totalUsuariosActivos = new UsuarioLN().ShowUsuario().Count(u => u.Rol == "Usuario" && u.Estado);
 
                 byte[] pdf = Reportes.IncidenciaReportes.GenerarPdfListado(
                     incidenciasDelMes,
-                    $"Reporte Mensual de Incidencias - {mesAnterior:MMMM yyyy}",
+                    $"Reporte Mensual de Incidencias - {nombreMes}",
                     totalUsuariosActivos,
-                    incidenciasMesAnteriorPrevio);
+                    incidenciasMesPrevio);
 
+                byte[] excel = Reportes.IncidenciaReportes.GenerarExcelListado(
+                    incidenciasDelMes,
+                    totalUsuariosActivos,
+                    incidenciasMesPrevio);
 
-                var admins = new UsuarioLN().ShowUsuario()
-                    .Where(u => u.Rol == "Administrador" && u.Estado && !string.IsNullOrWhiteSpace(u.Correo))
-                    .ToList();
+                var adjuntos = new List<Tuple<byte[], string>>
+                {
+                    new Tuple<byte[], string>(pdf, $"Reporte_Incidencias_{mesAnterior:yyyyMM}.pdf"),
+                    new Tuple<byte[], string>(excel, $"Reporte_Incidencias_{mesAnterior:yyyyMM}.xlsx")
+                };
 
+                int resueltas = incidenciasDelMes.Count(i => i.NombreEstado == "Resuelto" || i.NombreEstado == "Cerrado");
+                int pendientes = incidenciasDelMes.Count(i => i.NombreEstado == "Pendiente");
+
+                string asunto = $"Reporte Mensual de Incidencias - {nombreMes}";
+                string cuerpo =
+                    "Estimado(a) administrador(a):\n\n" +
+                    $"Adjunto encontrará el reporte mensual de incidencias correspondiente a {nombreMes} (PDF y Excel).\n\n" +
+                    "Resumen:\n" +
+                    $"  - Incidencias registradas: {incidenciasDelMes.Count} (mes anterior: {incidenciasMesPrevio.Count})\n" +
+                    $"  - Resueltas o cerradas: {resueltas}\n" +
+                    $"  - Pendientes: {pendientes}\n\n" +
+                    "Este correo fue generado automáticamente por el Sistema de Incidencias APPB.\n" +
+                    "Unidad de Tecnología - Autoridad Portuaria de Puerto Bolívar";
+
+                int enviados = 0;
                 foreach (var admin in admins)
                 {
-                    CorreoService.EnviarCorreoConAdjunto(
-                        admin.Correo,
-                        $"Reporte Mensual de Incidencias - {mesAnterior:MMMM yyyy}",
-                        $"Adjunto el reporte de incidencias correspondiente a {mesAnterior:MMMM yyyy}.",
-                        pdf,
-                        $"Reporte_Incidencias_{mesAnterior:yyyyMM}.pdf");
+                    try
+                    {
+                        CorreoService.EnviarCorreoConAdjuntos(admin.Correo, asunto, cuerpo, adjuntos);
+                        enviados++;
+                    }
+                    catch (Exception exCorreo)
+                    {
+                        Log.Error(exCorreo, "Reporte mensual: no se pudo enviar a {Correo}.", admin.Correo);
+                    }
                 }
 
-                reporteMensualLN.RegistrarEnvio(mesAnterior.Year, mesAnterior.Month);
-                Log.Information("Reporte mensual de {Mes} enviado a {Cantidad} administrador(es).", mesAnterior.ToString("MMMM yyyy"), admins.Count);
+                if (enviados > 0)
+                {
+                    reporteMensualLN.RegistrarEnvio(mesAnterior.Year, mesAnterior.Month);
+                    new AuditoriaLN().Registrar(null, "Bot (automático)", "Enviar reporte mensual", "Reporte", null,
+                        $"Reporte de {nombreMes} enviado a {enviados} de {admins.Count} administrador(es).");
+                    Log.Information("Reporte mensual de {Mes} enviado a {Enviados} de {Total} administrador(es).", nombreMes, enviados, admins.Count);
+                }
+                else
+                {
+                    Log.Warning("Reporte mensual de {Mes}: no se pudo enviar a ningún administrador. Se reintentará en 6 horas.", nombreMes);
+                }
             }
             catch (Exception ex)
             {

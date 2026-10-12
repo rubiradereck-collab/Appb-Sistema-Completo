@@ -15,18 +15,20 @@ import { exportToPDF, exportToExcel } from '../utils/exportUtils';
 const Dashboard = () => {
   const { user } = useAuth();
   const { isDarkMode, autoRefresh, refreshInterval } = useSettings();
-  const [incidencias, setIncidencias] = useState([]);
+  const [todasIncidencias, setTodasIncidencias] = useState([]);
   const [estados, setEstados] = useState([]);
   const [areas, setAreas] = useState([]);
   const [adopcion, setAdopcion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emailModal, setEmailModal] = useState({ show: false, email: '' });
   const [periodo, setPeriodo] = useState('Todo el histórico');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [activeTab, setActiveTab] = useState('estado');
 
   useEffect(() => {
     fetchData();
-  }, [periodo]);
+  }, []);
 
   useAutoRefresh(() => fetchData(true), autoRefresh ? refreshInterval : null);
 
@@ -38,7 +40,7 @@ const Dashboard = () => {
         api.get('/estados', isAutoRefresh ? { silent: true } : {}),
         api.get('/areas', isAutoRefresh ? { silent: true } : {})
       ]);
-      setIncidencias(incRes.data);
+      setTodasIncidencias(incRes.data);
       setEstados(estRes.data);
       setAreas(areaRes.data);
       // La adopción va aparte: si falla, el resto del Dashboard sigue funcionando
@@ -50,6 +52,38 @@ const Dashboard = () => {
     }
     if (!isAutoRefresh) setLoading(false);
   };
+
+  // Filtro por periodo (mismas opciones que la app de escritorio, más "Mes anterior")
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const sumarDias = (fecha, dias) => { const d = new Date(fecha); d.setDate(d.getDate() + dias); return d; };
+  const rangoPeriodo = () => {
+    switch (periodo) {
+      case 'Hoy': return [hoy, sumarDias(hoy, 1)];
+      case 'Últimos 7 días': return [sumarDias(hoy, -6), sumarDias(hoy, 1)];
+      case 'Últimos 30 días': return [sumarDias(hoy, -29), sumarDias(hoy, 1)];
+      case 'Este mes': return [new Date(hoy.getFullYear(), hoy.getMonth(), 1), sumarDias(hoy, 1)];
+      case 'Mes anterior': return [new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1), new Date(hoy.getFullYear(), hoy.getMonth(), 1)];
+      case 'Personalizado': return [
+        desde ? new Date(`${desde}T00:00:00`) : null,
+        hasta ? sumarDias(new Date(`${hasta}T00:00:00`), 1) : null
+      ];
+      default: return [null, null];
+    }
+  };
+  const [inicioPeriodo, finPeriodo] = rangoPeriodo();
+  const incidencias = todasIncidencias.filter(i => {
+    const f = new Date(i.Fecha);
+    return (!inicioPeriodo || f >= inicioPeriodo) && (!finPeriodo || f < finPeriodo);
+  });
+
+  const capitalizar = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const descripcionPeriodo = (() => {
+    if (periodo === 'Mes anterior') return capitalizar(inicioPeriodo.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' }));
+    if (periodo === 'Este mes') return capitalizar(hoy.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' }));
+    if (periodo === 'Personalizado') return `${desde || '...'} a ${hasta || '...'}`;
+    return periodo;
+  })();
+  const sufijoArchivo = descripcionPeriodo.replace(/[^A-Za-z0-9áéíóúñÁÉÍÓÚÑ]+/g, '_');
 
   // Cálculos de tarjetas
   const total = incidencias.length;
@@ -105,7 +139,7 @@ const Dashboard = () => {
       return;
     }
     try {
-      await exportToPDF(incidencias, 'Reporte de Incidencias', `Reporte_Incidencias_${new Date().toISOString().split('T')[0]}.pdf`);
+      await exportToPDF(incidencias, `Reporte de Incidencias - ${descripcionPeriodo}`, `Reporte_Incidencias_${sufijoArchivo}.pdf`);
     } catch (err) {
       console.error(err);
       window.dispatchEvent(new CustomEvent('app-error', {detail: 'Error al exportar reporte PDF'}));
@@ -126,17 +160,19 @@ const Dashboard = () => {
     setEmailModal({ show: false, email: '' });
 
     try {
-      const filename = `Reporte_Incidencias_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.pdf`;
-      const base64Pdf = await exportToPDF(incidencias, 'Reporte Mensual de Incidencias', filename, true);
+      const filename = `Reporte_Incidencias_${sufijoArchivo}.pdf`;
+      const base64Pdf = await exportToPDF(incidencias, `Reporte de Incidencias - ${descripcionPeriodo}`, filename, true);
       
       const res = await api.post('/reportes/enviar', {
         pdfBase64: base64Pdf,
         filename: filename,
-        email: emailModal.email
+        email: emailModal.email,
+        asunto: `Reporte de Incidencias APPB - ${descripcionPeriodo}`,
+        mensaje: `Adjunto encontrará el reporte de incidencias (${descripcionPeriodo}) generado desde la aplicación móvil del Sistema de Incidencias APPB.`
       });
       window.dispatchEvent(new CustomEvent('app-success', {detail: res.data.message || 'Reporte enviado con éxito'}));
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Error al generar o enviar reporte mensual';
+      const errorMsg = err.response?.data?.message || 'Error al generar o enviar el reporte';
       window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
     }
   };
@@ -148,7 +184,7 @@ const Dashboard = () => {
     }
     
     try {
-      await exportToExcel(incidencias, `Reporte_Incidencias_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.xlsx`);
+      await exportToExcel(incidencias, `Reporte_Incidencias_${sufijoArchivo}.xlsx`);
       
     } catch (err) {
       console.error(err);
@@ -165,10 +201,13 @@ const Dashboard = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-dark/60 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
             <div className="bg-brand-dark p-5 text-white font-bold flex justify-between items-center">
-              <span className="flex items-center space-x-2"><FiMail className="text-xl" /><span>Enviar Reporte Mensual</span></span>
+              <span className="flex items-center space-x-2"><FiMail className="text-xl" /><span>Enviar Reporte</span></span>
               <button onClick={() => setEmailModal({ show: false, email: '' })} className="text-gray-400 hover:text-white transition-colors bg-white dark:bg-gray-800/10 p-1.5 rounded-lg"><FiX /></button>
             </div>
             <div className="p-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 ml-1">
+                Periodo: <span className="font-bold text-gray-700 dark:text-gray-200">{descripcionPeriodo}</span> · {incidencias.length} incidencia(s)
+              </p>
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Correo de Destino</label>
               <input 
                 type="email" 
@@ -202,11 +241,23 @@ const Dashboard = () => {
               onChange={e => setPeriodo(e.target.value)}
             >
               <option>Todo el histórico</option>
-              <option>Este Mes</option>
-              <option>Esta Semana</option>
               <option>Hoy</option>
-              <option>Personalizado...</option>
+              <option>Últimos 7 días</option>
+              <option>Últimos 30 días</option>
+              <option>Este mes</option>
+              <option>Mes anterior</option>
+              <option>Personalizado</option>
             </select>
+            {periodo === 'Personalizado' && (
+              <>
+                <input type="date" value={desde} max={hasta || undefined} onChange={e => setDesde(e.target.value)}
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2 px-3 shadow-sm outline-none focus:ring-2 focus:ring-brand-blue"
+                  aria-label="Desde" />
+                <input type="date" value={hasta} min={desde || undefined} onChange={e => setHasta(e.target.value)}
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl py-2 px-3 shadow-sm outline-none focus:ring-2 focus:ring-brand-blue"
+                  aria-label="Hasta" />
+              </>
+            )}
 
             <button onClick={handleExportPDF} className="bg-red-50 text-red-600 hover:bg-red-100 p-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors" title="Exportar a PDF">
               <FiDownload className="text-lg" />
@@ -215,7 +266,7 @@ const Dashboard = () => {
               <FiDownload className="text-lg" />
             </button>
             {user?.Rol === 'Administrador' && (
-              <button onClick={handleOpenEmailModal} className="bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center space-x-2 shadow-sm transition-colors" title="Forzar envío de reporte mensual">
+              <button onClick={handleOpenEmailModal} className="bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center space-x-2 shadow-sm transition-colors" title="Enviar por correo el reporte del periodo seleccionado">
                 <FiMail className="text-lg" />
                 <span className="hidden md:inline">Enviar Reporte</span>
               </button>

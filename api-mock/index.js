@@ -59,9 +59,9 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
 
     let mensaje = '';
     if (accion === 'asignar') {
-      mensaje = `ðŸ”” Se te ha asignado la Incidencia #${incidenciaId}`;
+      mensaje = `🔔 Se te ha asignado la Incidencia #${incidenciaId}`;
     } else if (accion === 'estado') {
-      mensaje = `â„¹ï¸ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+      mensaje = `ℹ️ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
     }
     
     if (mensaje) await enviarTelegram(chatId, mensaje);
@@ -71,7 +71,7 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecn
 };
 
 const app = express();
-app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url);next();});
+app.use((req,res,next)=>{console.log('['+new Date().toLocaleTimeString()+'] '+req.method+' '+req.url.replace(/token=[^&]+/i,'token=***'));next();});
 app.use(cors());
   app.use('/descargas', require('express').static(require('path').join(__dirname, 'public-descargas')));
 
@@ -79,7 +79,11 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_12345";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error("FATAL: JWT_SECRET no esta definido en .env o tiene menos de 32 caracteres. El servidor no puede iniciar.");
+  process.exit(1);
+}
 
 // Configuración Nodemailer
 let smtpConfigured = false;
@@ -114,7 +118,7 @@ app.get("/api/test-db", async (req, res) => {
     res.json({ success: true, message: "Conexión a SQL Server exitosa", data: result.recordset });
   } catch (err) {
     console.error("Test DB falló:", err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: "No se pudo conectar a la base de datos" });
   }
 });
 
@@ -182,7 +186,7 @@ app.post("/api/auth/login", async (req, res) => {
       
     const user = result.recordset[0];
     if (!user) {
-      return res.status(401).json({ success: false, message: "Usuario no encontrado" });
+      return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
     }
     if (user.Estado === false) {
       return res.status(401).json({ success: false, message: "Usuario inactivo" });
@@ -215,7 +219,7 @@ app.post("/api/auth/login", async (req, res) => {
       
     const token = jwt.sign(
       { IdUsuario: user.IdUsuario, Rol: user.Rol },
-      process.env.JWT_SECRET || "super_secret_key_12345",
+      JWT_SECRET,
       { expiresIn: "8h" }
     );
 
@@ -242,7 +246,7 @@ const verifyToken = (req, res, next) => {
 
   if (!token) return res.status(401).json({ message: "Token requerido" });
 
-  jwt.verify(token, process.env.JWT_SECRET || "super_secret_key_12345", (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(401).json({ message: "Token inválido o expirado" });
     req.user = decoded;
     next();
@@ -279,12 +283,27 @@ app.post('/api/interno/notificar', async (req, res) => {
 
 app.use(verifyToken);
 
+// Error 500 sin exponer detalles internos (SQL, rutas) al cliente
+const responderError = (res, err) => {
+  console.error(err);
+  return res.status(500).json({ message: "Error interno del servidor" });
+};
+
 const requireAdmin = (req, res, next) => {
   if (req.user.Rol !== "Administrador") {
     return res.status(403).json({ message: "Acceso denegado: Se requiere rol de Administrador" });
   }
   next();
 };
+
+// Nombre completo del usuario autenticado (para filtrar incidencias del rol Usuario por Empleado)
+async function obtenerNombreCompleto(pool, idUsuario) {
+  const r = await pool.request()
+    .input("Id", sql.Int, idUsuario)
+    .query("SELECT Nombre, Apellido FROM Usuarios WHERE IdUsuario = @Id");
+  if (!r.recordset[0]) return null;
+  return `${(r.recordset[0].Nombre || "").trim()} ${(r.recordset[0].Apellido || "").trim()}`.trim();
+}
 
 async function registrarAuditoria(pool, req, accion, idRef, detalles, entidad = "Incidencia") {
   try {
@@ -310,7 +329,7 @@ app.get("/api/areas", async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT * FROM Areas");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/areas", requireAdmin, async (req, res) => {
@@ -320,7 +339,7 @@ app.post("/api/areas", requireAdmin, async (req, res) => {
       .input("NombreArea", sql.VarChar, req.body.NombreArea)
       .query("INSERT INTO Areas (NombreArea) OUTPUT INSERTED.IdArea VALUES (@NombreArea)");
     res.status(201).json({ id: result.recordset[0].IdArea });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.put("/api/areas/:id", requireAdmin, async (req, res) => {
@@ -331,7 +350,7 @@ app.put("/api/areas/:id", requireAdmin, async (req, res) => {
       .input("NombreArea", sql.VarChar, req.body.NombreArea)
       .query("UPDATE Areas SET NombreArea = @NombreArea WHERE IdArea = @IdArea");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
@@ -339,7 +358,7 @@ app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
     const pool = await getSqlServerDb();
     await pool.request().input("IdArea", sql.Int, req.params.id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/prioridades", async (req, res) => {
@@ -347,7 +366,7 @@ app.get("/api/prioridades", async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/estados", async (req, res) => {
@@ -355,7 +374,7 @@ app.get("/api/estados", async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/guias", async (req, res) => {
@@ -363,7 +382,7 @@ app.get("/api/guias", async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT * FROM Guias");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/guias/:id/enviar", async (req, res) => {
@@ -403,7 +422,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
       console.error("Error al enviar guía:", mailErr.message);
       res.status(500).json({ error: "No se pudo enviar el correo. Revisa la configuración SMTP." });
     }
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/guias", requireAdmin, async (req, res) => {
@@ -416,7 +435,7 @@ app.post("/api/guias", requireAdmin, async (req, res) => {
       .input("Solucion", sql.VarChar, Solucion)
       .query("INSERT INTO Guias (Titulo, Problema, Solucion) VALUES (@Titulo, @Problema, @Solucion)");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.put("/api/guias/:id", requireAdmin, async (req, res) => {
@@ -430,7 +449,7 @@ app.put("/api/guias/:id", requireAdmin, async (req, res) => {
       .input("Solucion", sql.VarChar, Solucion)
       .query("UPDATE Guias SET Titulo = @Titulo, Problema = @Problema, Solucion = @Solucion WHERE IdGuia = @IdGuia");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
@@ -440,7 +459,7 @@ app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
       .input("IdGuia", sql.Int, req.params.id)
       .query("DELETE FROM Guias WHERE IdGuia = @IdGuia");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/auditoria", requireAdmin, async (req, res) => {
@@ -448,7 +467,7 @@ app.get("/api/auditoria", requireAdmin, async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT * FROM Auditoria ORDER BY Fecha DESC");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
@@ -516,7 +535,7 @@ app.get("/api/adopcion", async (req, res) => {
     const adopcionPorcentaje = totalUsuariosActivos > 0 ? Math.min(100, (reportan / totalUsuariosActivos) * 100) : 0;
     res.json({ adopcionPorcentaje, totalUsuariosActivos, usuariosQueReportan: reportan, totalDestinatariosCorreo: corr.recordset[0].Total });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    responderError(res, err);
   }
 });
 
@@ -525,7 +544,7 @@ app.get("/api/usuarios", requireAdmin, async (req, res) => {
     const pool = await getSqlServerDb();
     const result = await pool.request().query("SELECT * FROM Usuarios");
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/usuarios", requireAdmin, async (req, res) => {
@@ -541,7 +560,7 @@ app.post("/api/usuarios", requireAdmin, async (req, res) => {
       .input("Rol", sql.VarChar, req.body.Rol)
       .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) OUTPUT INSERTED.IdUsuario VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, 1, 0)");
     res.status(201).json({ id: result.recordset[0].IdUsuario });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
@@ -580,7 +599,7 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
   
       res.json({ success: true, message: "Contraseña actualizada y correo enviado" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { responderError(res, err); }
   });
 
 app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
@@ -602,7 +621,7 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
                   Usuario = @Usuario, Rol = @Rol, Estado = @Estado, TelegramChatId = @TelegramChatId 
               WHERE IdUsuario = @IdUsuario`);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/usuarios/:id", requireAdmin, async (req, res) => {
@@ -612,7 +631,7 @@ app.delete("/api/usuarios/:id", requireAdmin, async (req, res) => {
       .input("IdUsuario", sql.Int, req.params.id)
       .query("DELETE FROM Usuarios WHERE IdUsuario = @IdUsuario");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/perfil", verifyToken, async (req, res) => {
@@ -631,7 +650,7 @@ app.get("/api/perfil", verifyToken, async (req, res) => {
     } else {
       res.status(404).json({ message: "Usuario no encontrado" });
     }
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/perfil/foto", async (req, res) => {
@@ -646,7 +665,7 @@ app.post("/api/perfil/foto", async (req, res) => {
       .input("IdUsuario", sql.Int, req.user.IdUsuario)
       .query("UPDATE Usuarios SET FotoPerfil = @FotoPerfil WHERE IdUsuario = @IdUsuario");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/perfil/foto", async (req, res) => {
@@ -656,7 +675,7 @@ app.delete("/api/perfil/foto", async (req, res) => {
       .input("IdUsuario", sql.Int, req.user.IdUsuario)
       .query("UPDATE Usuarios SET FotoPerfil = NULL WHERE IdUsuario = @IdUsuario");
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 // INCIDENCIAS
@@ -677,12 +696,17 @@ app.get("/api/incidencias", async (req, res) => {
     `;
     
     const request = pool.request();
-    // En la DB real no hay IdUsuarioReporta. Todo se filtra por Empleado si se requiere
+    // El rol Usuario solo ve sus propias incidencias (misma regla que la app de escritorio)
+    if (req.user.Rol === "Usuario") {
+      const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
+      request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
+      query += " WHERE LOWER(LTRIM(RTRIM(i.Empleado))) = @NombreCompleto";
+    }
     query += " ORDER BY i.Fecha DESC";
     
     const result = await request.query(query);
     res.json(result.recordset);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.get("/api/incidencias/:id", async (req, res) => {
@@ -708,13 +732,24 @@ app.get("/api/incidencias/:id", async (req, res) => {
     if (result.recordset.length === 0) {
       return res.status(404).json({ message: "No encontrada" });
     }
+    if (req.user.Rol === "Usuario") {
+      const nombre = (await obtenerNombreCompleto(pool, req.user.IdUsuario) || "").toLowerCase();
+      if ((result.recordset[0].Empleado || "").trim().toLowerCase() !== nombre) {
+        return res.status(403).json({ message: "No tienes acceso a esta incidencia" });
+      }
+    }
     res.json(result.recordset[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/incidencias", async (req, res) => {
   try {
-    const { Descripcion, IdPrioridad, IdArea, Empleado, TipoIncidencia, origen } = req.body;
+    const { Descripcion, IdPrioridad, IdArea, TipoIncidencia, origen } = req.body;
+    let { Empleado } = req.body;
+    if (req.user.Rol === "Usuario") {
+      // Un Usuario solo puede reportar a su propio nombre
+      Empleado = await obtenerNombreCompleto(await getSqlServerDb(), req.user.IdUsuario);
+    }
     if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado inválido" });
     if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo inválido" });
     if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "Descripción muy corta" });
@@ -742,7 +777,7 @@ app.post("/api/incidencias", async (req, res) => {
     const newIn = await pool.request().input("IdIncidencia", sql.Int, newId).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     res.status(201).json(newIn.recordset[0]);
       notificarNuevaIncidencia(pool, newIn.recordset[0], origen || 'App Móvil');
-  } catch (err) { console.error(err); res.status(500).json({ error: err.message }); }
+  } catch (err) { console.error(err); responderError(res, err); }
 });
 
 app.put("/api/incidencias/:id", async (req, res) => {
@@ -753,6 +788,13 @@ app.put("/api/incidencias/:id", async (req, res) => {
     const actualResult = await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     const actual = actualResult.recordset[0];
     if (!actual) return res.status(404).json({ message: "No encontrada" });
+
+    // Un Técnico solo puede asignarse a sí mismo una incidencia sin técnico (botón "Aceptar"),
+    // no reasignarla ni desasignarla (misma regla que la app de escritorio)
+    if (req.user.Rol === "Técnico" && IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado) {
+      const esAutoAsignacion = IdTecnicoAsignado === req.user.IdUsuario && !actual.IdTecnicoAsignado;
+      if (!esAutoAsignacion) return res.status(403).json({ message: "Solo un administrador puede reasignar incidencias" });
+    }
 
     let setClauses = [];
     const request = pool.request();
@@ -793,7 +835,7 @@ app.put("/api/incidencias/:id", async (req, res) => {
     }
     
     res.json({ success: true });
-  } catch(err) { console.error(err); res.status(500).json({ error: err.message }); }
+  } catch(err) { console.error(err); responderError(res, err); }
 });
 
 app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
@@ -802,31 +844,44 @@ app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
     await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     await registrarAuditoria(pool, req, "Eliminar", req.params.id, "Eliminó el ticket permanentemente");
     res.json({ success: true });
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch(err) { responderError(res, err); }
 });
 
 const { generarPdfIncidencias, generarExcelIncidencias } = require('./reports');
 
+// Consulta para los reportes PDF/Excel; el rol Usuario solo recibe sus incidencias
+async function consultarIncidenciasReporte(pool, req) {
+  const request = pool.request();
+  let query = `SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre + ' ' + t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`;
+  if (req.user.Rol === "Usuario") {
+    const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
+    request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
+    query += " WHERE LOWER(LTRIM(RTRIM(i.Empleado))) = @NombreCompleto";
+  }
+  query += " ORDER BY i.Fecha DESC";
+  return request.query(query);
+}
+
 app.get('/api/reportes/incidencias/pdf', async (req, res) => {
   try {
     const pool = await getSqlServerDb();
-    const result = await pool.request().query(`SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre + ' ' + t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`);
+    const result = await consultarIncidenciasReporte(pool, req);
     const pdfBuffer = await generarPdfIncidencias(result.recordset);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=Incidencias.pdf');
     res.send(pdfBuffer);
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch(err) { responderError(res, err); }
 });
 
 app.get('/api/reportes/incidencias/excel', async (req, res) => {
   try {
     const pool = await getSqlServerDb();
-    const result = await pool.request().query(`SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre + ' ' + t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`);
+    const result = await consultarIncidenciasReporte(pool, req);
     const excelBuffer = await generarExcelIncidencias(result.recordset);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=Incidencias.xlsx');
     res.send(excelBuffer);
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch(err) { responderError(res, err); }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

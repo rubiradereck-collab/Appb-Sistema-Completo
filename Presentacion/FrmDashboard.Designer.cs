@@ -43,6 +43,7 @@
             System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmDashboard));
             this.panelToolbar = new System.Windows.Forms.Panel();
+            this.btnEnviarCorreo = new System.Windows.Forms.Button();
             this.dtpHasta = new System.Windows.Forms.DateTimePicker();
             this.dtpDesde = new System.Windows.Forms.DateTimePicker();
             this.cboRangoFecha = new System.Windows.Forms.ComboBox();
@@ -58,11 +59,11 @@
             this.lblResueltosTitulo = new System.Windows.Forms.Label();
             this.lblResueltosValor = new System.Windows.Forms.Label();
             this.panelTiempoPromedio = new System.Windows.Forms.Panel();
+            this.lblTiempoPromedioTitulo = new System.Windows.Forms.Label();
+            this.lblTiempoPromedioValor = new System.Windows.Forms.Label();
             this.panelAdopcion = new System.Windows.Forms.Panel();
             this.lblAdopcionTitulo = new System.Windows.Forms.Label();
             this.lblAdopcionValor = new System.Windows.Forms.Label();
-            this.lblTiempoPromedioTitulo = new System.Windows.Forms.Label();
-            this.lblTiempoPromedioValor = new System.Windows.Forms.Label();
             this.TabControl = new System.Windows.Forms.TabControl();
             this.tabEstado = new System.Windows.Forms.TabPage();
             this.chartEstado = new System.Windows.Forms.DataVisualization.Charting.Chart();
@@ -73,7 +74,6 @@
             this.tabTendencia = new System.Windows.Forms.TabPage();
             this.chartTendencia = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
-            this.btnEnviarCorreo = new System.Windows.Forms.Button();
             this.panelToolbar.SuspendLayout();
             this.flowTarjetas.SuspendLayout();
             this.panelTotal.SuspendLayout();
@@ -105,6 +105,21 @@
             this.panelToolbar.Name = "panelToolbar";
             this.panelToolbar.Size = new System.Drawing.Size(857, 45);
             this.panelToolbar.TabIndex = 0;
+            // 
+            // btnEnviarCorreo
+            // 
+            this.btnEnviarCorreo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnEnviarCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
+            this.btnEnviarCorreo.FlatAppearance.BorderSize = 0;
+            this.btnEnviarCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnEnviarCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnEnviarCorreo.ForeColor = System.Drawing.Color.White;
+            this.btnEnviarCorreo.Location = new System.Drawing.Point(546, 3);
+            this.btnEnviarCorreo.Name = "btnEnviarCorreo";
+            this.btnEnviarCorreo.Size = new System.Drawing.Size(140, 35);
+            this.btnEnviarCorreo.TabIndex = 31;
+            this.btnEnviarCorreo.Text = "📧 Enviar por Correo";
+            this.btnEnviarCorreo.UseVisualStyleBackColor = false;
             // 
             // dtpHasta
             // 
@@ -319,13 +334,46 @@
             this.lblTiempoPromedioValor.Text = "Valor";
             this.lblTiempoPromedioValor.TextAlign = System.Drawing.ContentAlignment.TopCenter;
             // 
+            // panelAdopcion
+            // 
+            this.panelAdopcion.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(204)))), ((int)(((byte)(113)))));
+            this.panelAdopcion.Controls.Add(this.lblAdopcionTitulo);
+            this.panelAdopcion.Controls.Add(this.lblAdopcionValor);
+            this.panelAdopcion.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panelAdopcion.Location = new System.Drawing.Point(3, 97);
+            this.panelAdopcion.Name = "panelAdopcion";
+            this.panelAdopcion.Size = new System.Drawing.Size(207, 88);
+            this.panelAdopcion.TabIndex = 4;
+            // 
+            // lblAdopcionTitulo
+            // 
+            this.lblAdopcionTitulo.AutoSize = true;
+            this.lblAdopcionTitulo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblAdopcionTitulo.ForeColor = System.Drawing.Color.White;
+            this.lblAdopcionTitulo.Location = new System.Drawing.Point(14, 14);
+            this.lblAdopcionTitulo.Name = "lblAdopcionTitulo";
+            this.lblAdopcionTitulo.Size = new System.Drawing.Size(167, 20);
+            this.lblAdopcionTitulo.TabIndex = 0;
+            this.lblAdopcionTitulo.Text = "Adopción de Sistema";
+            // 
+            // lblAdopcionValor
+            // 
+            this.lblAdopcionValor.AutoSize = true;
+            this.lblAdopcionValor.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblAdopcionValor.ForeColor = System.Drawing.Color.White;
+            this.lblAdopcionValor.Location = new System.Drawing.Point(14, 38);
+            this.lblAdopcionValor.Name = "lblAdopcionValor";
+            this.lblAdopcionValor.Size = new System.Drawing.Size(79, 46);
+            this.lblAdopcionValor.TabIndex = 1;
+            this.lblAdopcionValor.Text = "0%";
+            // 
             // TabControl
             // 
             this.TabControl.Controls.Add(this.tabEstado);
             this.TabControl.Controls.Add(this.tabPrioridad);
             this.TabControl.Controls.Add(this.tabArea);
             this.TabControl.Controls.Add(this.tabTendencia);
-            this.TabControl.Location = new System.Drawing.Point(3, 97);
+            this.TabControl.Location = new System.Drawing.Point(3, 191);
             this.TabControl.Name = "TabControl";
             this.TabControl.SelectedIndex = 0;
             this.TabControl.Size = new System.Drawing.Size(846, 381);
@@ -450,62 +498,12 @@
             this.chartTendencia.TabIndex = 1;
             this.chartTendencia.Text = "chart1";
             // 
-            // btnEnviarCorreo
-            // 
-            this.btnEnviarCorreo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnEnviarCorreo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(152)))), ((int)(((byte)(219)))));
-            this.btnEnviarCorreo.FlatAppearance.BorderSize = 0;
-            this.btnEnviarCorreo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnEnviarCorreo.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnEnviarCorreo.ForeColor = System.Drawing.Color.White;
-            this.btnEnviarCorreo.Location = new System.Drawing.Point(546, 3);
-            this.btnEnviarCorreo.Name = "btnEnviarCorreo";
-            this.btnEnviarCorreo.Size = new System.Drawing.Size(140, 35);
-            this.btnEnviarCorreo.TabIndex = 31;
-            this.btnEnviarCorreo.Text = "📧 Enviar por Correo";
-            this.btnEnviarCorreo.UseVisualStyleBackColor = false;
-            // 
             // FrmDashboard
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(224)))), ((int)(((byte)(224)))));
             this.ClientSize = new System.Drawing.Size(857, 550);
-            
-            // 
-            // panelAdopcion
-            // 
-            this.panelAdopcion.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(204)))), ((int)(((byte)(113)))));
-            this.panelAdopcion.Controls.Add(this.lblAdopcionTitulo);
-            this.panelAdopcion.Controls.Add(this.lblAdopcionValor);
-            this.panelAdopcion.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panelAdopcion.Location = new System.Drawing.Point(855, 3);
-            this.panelAdopcion.Name = "panelAdopcion";
-            this.panelAdopcion.Size = new System.Drawing.Size(207, 88);
-            this.panelAdopcion.TabIndex = 4;
-            // 
-            // lblAdopcionTitulo
-            // 
-            this.lblAdopcionTitulo.AutoSize = true;
-            this.lblAdopcionTitulo.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblAdopcionTitulo.ForeColor = System.Drawing.Color.White;
-            this.lblAdopcionTitulo.Location = new System.Drawing.Point(14, 14);
-            this.lblAdopcionTitulo.Name = "lblAdopcionTitulo";
-            this.lblAdopcionTitulo.Size = new System.Drawing.Size(124, 16);
-            this.lblAdopcionTitulo.TabIndex = 0;
-            this.lblAdopcionTitulo.Text = "Adopción de Sistema";
-            // 
-            // lblAdopcionValor
-            // 
-            this.lblAdopcionValor.AutoSize = true;
-            this.lblAdopcionValor.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblAdopcionValor.ForeColor = System.Drawing.Color.White;
-            this.lblAdopcionValor.Location = new System.Drawing.Point(14, 38);
-            this.lblAdopcionValor.Name = "lblAdopcionValor";
-            this.lblAdopcionValor.Size = new System.Drawing.Size(55, 37);
-            this.lblAdopcionValor.TabIndex = 1;
-            this.lblAdopcionValor.Text = "0%";
-            
             this.Controls.Add(this.flowTarjetas);
             this.Controls.Add(this.panelToolbar);
             this.ForeColor = System.Drawing.Color.Black;
@@ -523,6 +521,8 @@
             this.panelResueltos.PerformLayout();
             this.panelTiempoPromedio.ResumeLayout(false);
             this.panelTiempoPromedio.PerformLayout();
+            this.panelAdopcion.ResumeLayout(false);
+            this.panelAdopcion.PerformLayout();
             this.TabControl.ResumeLayout(false);
             this.tabEstado.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.chartEstado)).EndInit();

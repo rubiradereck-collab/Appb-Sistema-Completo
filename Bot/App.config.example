@@ -1,9 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <configuration>
 	<connectionStrings>
-    		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2"
-      		connectionString="Data Source=131.150.25.22,1433;Initial Catalog=DBIncidencias;Persist Security Info=True;User ID=appb_app;Password=TU_PASSWORD_SQL;Encrypt=True;TrustServerCertificate=True"
-      		providerName="System.Data.SqlClient" />
+		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2" connectionString="Data Source=131.150.25.22,1433;Initial Catalog=DBIncidencias;Persist Security Info=True;User ID=appb_app;Password=TU_PASSWORD_SQL;Encrypt=True;TrustServerCertificate=True" providerName="System.Data.SqlClient" />
 	</connectionStrings>
 	<appSettings>
 		<add key="TelegramBotToken" value="PON_AQUI_TU_TOKEN" />
@@ -83,10 +81,6 @@
 			<dependentAssembly>
 				<assemblyIdentity name="System.ComponentModel.Annotations" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
 				<bindingRedirect oldVersion="0.0.0.0-4.2.1.0" newVersion="4.2.1.0" />
-			</dependentAssembly>
-			<dependentAssembly>
-				<assemblyIdentity name="System.Runtime.InteropServices.RuntimeInformation" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
-				<bindingRedirect oldVersion="0.0.0.0-4.0.1.0" newVersion="4.0.1.0" />
 			</dependentAssembly>
 		</assemblyBinding>
 	</runtime>

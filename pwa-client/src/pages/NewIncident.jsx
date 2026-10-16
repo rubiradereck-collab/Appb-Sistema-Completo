@@ -12,13 +12,14 @@ const NewIncident = () => {
   const navigate = useNavigate();
   const [areas, setAreas] = useState([]);
   const [prioridades, setPrioridades] = useState([]);
+  const [tipos, setTipos] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
   
   const [formData, setFormData] = useState({
     Empleado: user?.Nombre + ' ' + user?.Apellido,
     IdArea: '',
-    TipoIncidencia: '',
+    IdTipoIncidencia: '',
     Descripcion: '',
     IdPrioridad: ''
   });
@@ -27,12 +28,14 @@ const NewIncident = () => {
     // Cargar catálogos
     const fetchData = async () => {
       try {
-        const [arRes, prRes] = await Promise.all([
+        const [arRes, prRes, tiRes] = await Promise.all([
           api.get('/areas'),
-          api.get('/prioridades')
+          api.get('/prioridades'),
+          api.get('/tipos-incidencia?activos=1')
         ]);
         setAreas(arRes.data);
         setPrioridades(prRes.data);
+        setTipos(tiRes.data);
         if (arRes.data.length > 0) setFormData(f => ({ ...f, IdArea: arRes.data[0].IdArea }));
         if (prRes.data.length > 0) setFormData(f => ({ ...f, IdPrioridad: prRes.data[0].IdPrioridad }));
       } catch (error) {
@@ -114,17 +117,18 @@ const NewIncident = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Problema</label>
-              <input 
-                type="text"
-                name="TipoIncidencia"
-                value={formData.TipoIncidencia}
+              <select
+                name="IdTipoIncidencia"
+                value={formData.IdTipoIncidencia}
                 onChange={handleChange}
-                maxLength={100}
-                placeholder="Ej. Problema de red, Software no abre..."
                 required
-                className="w-full px-4 py-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {formData.TipoIncidencia.length >= 100 && <p className="text-xs text-red-500 mt-1">Límite de 100 caracteres alcanzado.</p>}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccione el tipo</option>
+                {tipos.map(t => (
+                  <option key={t.IdTipoIncidencia} value={t.IdTipoIncidencia}>{t.Nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div>

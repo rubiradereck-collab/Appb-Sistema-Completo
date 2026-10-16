@@ -35,6 +35,14 @@ namespace Entidades.Gestion_de_Entidades
         // si otra persona cambió la incidencia mientras la teníamos abierta.
         private byte[] filaVersion;
 
+        // Etapa 2. IdTipoIncidencia viene del catálogo TiposIncidencia (TipoIncidencia guarda su nombre).
+        // IdUsuarioReporta: quién reportó (null en tickets antiguos cuyo nombre no coincidió con un usuario).
+        // FechaAsignacion / FechaPrimeraRespuesta las llena un trigger de la BD; aquí son solo lectura.
+        private int? idTipoIncidencia;
+        private int? idUsuarioReporta;
+        private DateTime? fechaAsignacion;
+        private DateTime? fechaPrimeraRespuesta;
+
         public Incidencia()
         {
         }
@@ -75,6 +83,11 @@ namespace Entidades.Gestion_de_Entidades
         public string TecnicoAsignado { get => tecnicoAsignado; set => tecnicoAsignado = value; }
 
         public byte[] FilaVersion { get => filaVersion; set => filaVersion = value; }
+
+        public int? IdTipoIncidencia { get => idTipoIncidencia; set => idTipoIncidencia = value; }
+        public int? IdUsuarioReporta { get => idUsuarioReporta; set => idUsuarioReporta = value; }
+        public DateTime? FechaAsignacion { get => fechaAsignacion; set => fechaAsignacion = value; }
+        public DateTime? FechaPrimeraRespuesta { get => fechaPrimeraRespuesta; set => fechaPrimeraRespuesta = value; }
     }
 
 }

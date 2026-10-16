@@ -218,55 +218,128 @@ namespace Bot
             try
             {
                 var slaLN = new SlaLN();
-                var pendientes = new IncidenciaLN().ShowIncidencia()
-                    .Where(i => i.NombreEstado == "Pendiente")
-                    .ToList();
+                var incidencias = new IncidenciaLN().ShowIncidencia();
+                var usuarios = new UsuarioLN().ShowUsuario();
 
-                var vencidas = slaLN.ObtenerVencidasSinEscalar(pendientes);
-
-                foreach (var inc in vencidas)
+                // 1. Pendientes: nadie las ha tomado. Se avisa a todos los técnicos (o al asignado).
+                var pendientes = incidencias.Where(i => i.NombreEstado == "Pendiente").ToList();
+                foreach (var inc in slaLN.ObtenerVencidasSinEscalar(pendientes))
                 {
                     string mensaje = $"⚠️ *SLA VENCIDO* ⚠️\n\n" +
-                                      $"*Ticket:* {inc.NumeroTicket}\n" +
-                                      $"*Prioridad:* {inc.NombrePrioridad}\n" +
+                                      $"*Ticket:* {Md(inc.NumeroTicket)}\n" +
+                                      $"*Prioridad:* {Md(inc.NombrePrioridad)}\n" +
                                       $"*Lleva:* {(DateTime.Now - inc.Fecha).TotalHours:0.#} horas sin resolverse.\n" +
-                                      $"*Área:* {inc.NombreArea}\n\n" +
-                                      $"*Descripción:*\n{inc.Descripcion}";
+                                      $"*Área:* {Md(inc.NombreArea)}\n\n" +
+                                      $"*Descripción:*\n{Md(inc.Descripcion)}";
 
-                    List<Usuario> destinatarios;
+                    List<Usuario> destinatarios = inc.IdTecnicoAsignado.HasValue
+                        ? usuarios.Where(u => u.IdUsuario == inc.IdTecnicoAsignado.Value && u.TelegramChatId.HasValue).ToList()
+                        : usuarios.Where(u => u.Rol == "Técnico" && u.Estado && u.TelegramChatId.HasValue).ToList();
 
-                    if (inc.IdTecnicoAsignado.HasValue)
-                    {
-                        var tecnico = new UsuarioLN().ShowUsuario()
-                            .FirstOrDefault(u => u.IdUsuario == inc.IdTecnicoAsignado.Value && u.TelegramChatId.HasValue);
-                        destinatarios = tecnico != null ? new List<Usuario> { tecnico } : new List<Usuario>();
-                    }
-                    else
-                    {
-                        destinatarios = new UsuarioLN().ShowUsuario()
-                            .Where(u => u.Rol == "Técnico" && u.Estado && u.TelegramChatId.HasValue)
-                            .ToList();
-                    }
-
-                    foreach (var destinatario in destinatarios)
-                    {
-                        try
-                        {
-                            TelegramNotificador.EnviarMensaje(destinatario.TelegramChatId.Value, mensaje);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "Error notificando SLA vencido a {Usuario}", destinatario.Nombre);
-                        }
-                    }
-
+                    EnviarATodos(destinatarios, mensaje, "SLA vencido");
                     slaLN.MarcarEscalado(inc.IdIncidencia);
                     Log.Information("SLA vencido notificado para el ticket {Ticket}", inc.NumeroTicket);
+                }
+
+                // 2. En Proceso (Etapa 2): el técnico asignado se pasó del tiempo. Se avisa a él
+                //    y a los administradores, que pueden reasignar el ticket.
+                var enProceso = incidencias.Where(i => i.NombreEstado == "En Proceso").ToList();
+                foreach (var inc in slaLN.ObtenerVencidasEnProcesoSinEscalar(enProceso))
+                {
+                    DateTime desde = SlaLN.InicioConteo(inc, true);
+                    string mensaje = $"⏳ *SLA VENCIDO (En Proceso)* ⏳\n\n" +
+                                      $"*Ticket:* {Md(inc.NumeroTicket)}\n" +
+                                      $"*Técnico:* {Md(inc.TecnicoAsignado ?? "Sin asignar")}\n" +
+                                      $"*Prioridad:* {Md(inc.NombrePrioridad)}\n" +
+                                      $"*Lleva:* {(DateTime.Now - desde).TotalHours:0.#} horas en proceso.\n" +
+                                      $"*Área:* {Md(inc.NombreArea)}\n\n" +
+                                      $"*Descripción:*\n{Md(inc.Descripcion)}";
+
+                    var destinatarios = usuarios
+                        .Where(u => u.Estado && u.TelegramChatId.HasValue &&
+                                    (u.IdUsuario == inc.IdTecnicoAsignado || u.Rol == "Administrador"))
+                        .ToList();
+
+                    EnviarATodos(destinatarios, mensaje, "SLA en proceso vencido");
+                    slaLN.MarcarEscalado(inc.IdIncidencia, enProceso: true);
+                    Log.Information("SLA en proceso vencido notificado para el ticket {Ticket}", inc.NumeroTicket);
                 }
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "Error al revisar los SLA vencidos.");
+            }
+        }
+
+        private static void EnviarATodos(List<Usuario> destinatarios, string mensajeMarkdown, string motivo)
+        {
+            foreach (var destinatario in destinatarios)
+            {
+                try
+                {
+                    if (TelegramNotificador.EnviarMensaje(destinatario.TelegramChatId.Value, mensajeMarkdown) == null)
+                        Log.Warning("Telegram rechazó el aviso de {Motivo} para {Usuario}.", motivo, destinatario.Nombre);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error notificando {Motivo} a {Usuario}", motivo, destinatario.Nombre);
+                }
+            }
+        }
+
+        // ==========================================
+        // UTILIDADES (Etapa 2)
+        // ==========================================
+
+        /// <summary>
+        /// Escapa el texto que escriben los usuarios (descripción, nombres, observaciones) para el
+        /// Markdown de Telegram. Sin esto, un "_" o un "*" en la descripción hacía que Telegram
+        /// rechazara el mensaje completo y el técnico no recibía el aviso.
+        /// </summary>
+        static string Md(string texto)
+        {
+            if (string.IsNullOrEmpty(texto)) return texto ?? "";
+            var sb = new System.Text.StringBuilder(texto.Length + 8);
+            foreach (char c in texto)
+            {
+                if (c == '_' || c == '*' || c == '`' || c == '[') sb.Append('\\');
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Avisa (texto plano) a quien reportó el ticket, si tiene Telegram vinculado.</summary>
+        static async Task NotificarReportante(int idIncidencia, string texto, long? excepto = null)
+        {
+            try
+            {
+                var inc = new IncidenciaLN().ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia);
+                if (inc == null) return;
+
+                var usuarios = new UsuarioLN().ShowUsuario();
+                Usuario reportante = inc.IdUsuarioReporta.HasValue
+                    ? usuarios.FirstOrDefault(u => u.IdUsuario == inc.IdUsuarioReporta.Value)
+                    : usuarios.FirstOrDefault(u => IncidenciaLN.EsDelUsuario(inc, u));
+
+                if (reportante?.TelegramChatId == null || !reportante.Estado || reportante.TelegramChatId == excepto) return;
+
+                await botClient.SendMessage(reportante.TelegramChatId.Value, texto);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "No se pudo avisar al reportante del ticket {Id}.", idIncidencia);
+            }
+        }
+
+        static string EmojiTipo(string nombre)
+        {
+            switch ((nombre ?? "").Trim().ToLowerInvariant())
+            {
+                case "hardware": return "💻";
+                case "software": return "📀";
+                case "red": return "🌐";
+                case "otro": return "➕";
+                default: return "🏷️";
             }
         }
 
@@ -379,7 +452,7 @@ namespace Bot
                 if (!incidenciaExiste)
                 {
                     await botClient.AnswerCallbackQuery(callbackQuery.Id, "❌ Esta incidencia ya no existe (fue eliminada desde el sistema).", showAlert: true);
-                    await botClient.EditMessageText(chatId: chatId, messageId: callbackQuery.Message.MessageId, text: callbackQuery.Message.Text + "\n\n🗑️ *(Este ticket fue eliminado del sistema)*", parseMode: ParseMode.Markdown);
+                    await botClient.EditMessageText(chatId: chatId, messageId: callbackQuery.Message.MessageId, text: Md(callbackQuery.Message.Text) + "\n\n🗑️ *(Este ticket fue eliminado del sistema)*", parseMode: ParseMode.Markdown);
                     return;
                 }
 
@@ -390,7 +463,7 @@ namespace Bot
                     await botClient.AnswerCallbackQuery(callbackQuery.Id, "¡Ticket asignado a ti correctamente!", showAlert: false);
 
                     var inc = logica.BuscarPorTicket(logica.ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia)?.NumeroTicket);
-                    string textoBase = $"🚨 *NUEVA INCIDENCIA REPORTADA* 🚨\n\n*Ticket:* {inc.NumeroTicket}\n*Empleado:* {inc.Empleado}\n*Área:* {inc.NombreArea}\n*Tipo:* {inc.TipoIncidencia}\n*Prioridad:* {inc.NombrePrioridad}\n\n*Descripción:*\n{inc.Descripcion}";
+                    string textoBase = $"🚨 *NUEVA INCIDENCIA REPORTADA* 🚨\n\n*Ticket:* {Md(inc.NumeroTicket)}\n*Empleado:* {Md(inc.Empleado)}\n*Área:* {Md(inc.NombreArea)}\n*Tipo:* {Md(inc.TipoIncidencia)}\n*Prioridad:* {Md(inc.NombrePrioridad)}\n\n*Descripción:*\n{Md(inc.Descripcion)}";
 
                     var mensajesEnviados = logica.ObtenerMensajesTelegram(idIncidencia);
 
@@ -417,6 +490,12 @@ namespace Bot
                             Log.Error(ex, "Error borrando el botón al técnico con ChatId {ChatId}", m.ChatId);
                         }
                     }
+
+                    // Etapa 2: avisar a quien reportó
+                    var tecnicoQueAcepto = new UsuarioLN().BuscarPorChatId(chatId);
+                    string nombreTecnico = tecnicoQueAcepto != null ? $"{tecnicoQueAcepto.Nombre} {tecnicoQueAcepto.Apellido}" : "un técnico";
+                    await NotificarReportante(idIncidencia,
+                        $"🔔 Tu {inc.NumeroTicket} fue asignada a {nombreTecnico} y ya está En Proceso.", excepto: chatId);
                 }
                 else
                 {
@@ -479,20 +558,25 @@ namespace Bot
                         estado.Paso = 2;
                         await botClient.EditMessageText(chatId, callbackQuery.Message.MessageId, "✅ Área seleccionada.");
 
-                        var botonesTipo = new List<InlineKeyboardButton[]>
-                        {
-                            new[] { InlineKeyboardButton.WithCallbackData("💻 Hardware", "tipo_Hardware") },
-                            new[] { InlineKeyboardButton.WithCallbackData("📀 Software", "tipo_Software") },
-                            new[] { InlineKeyboardButton.WithCallbackData("🌐 Red", "tipo_Red") },
-                            new[] { InlineKeyboardButton.WithCallbackData("➕ Otro", "tipo_Otro") },
-                            new[] { InlineKeyboardButton.WithCallbackData("❌ Cancelar", "cancelar") }
-                        };
+                        // Etapa 2: los tipos salen del catálogo (solo los activos)
+                        var botonesTipo = new TipoIncidenciaLN().ShowTipos(soloActivos: true)
+                            .Select(t => new[] { InlineKeyboardButton.WithCallbackData($"{EmojiTipo(t.Nombre)} {t.Nombre}", $"tipo_{t.IdTipoIncidencia}") })
+                            .ToList();
+                        botonesTipo.Add(new[] { InlineKeyboardButton.WithCallbackData("❌ Cancelar", "cancelar") });
 
                         await botClient.SendMessage(chatId: chatId, text: "¿Cuál es el tipo de incidencia? *(Toca un botón)*:", parseMode: ParseMode.Markdown, replyMarkup: new InlineKeyboardMarkup(botonesTipo));
                     }
                     else if (estado.Paso == 2 && datosBoton.StartsWith("tipo_"))
                     {
-                        estado.TipoIncidencia = datosBoton.Substring(5);
+                        int idTipo = int.Parse(datosBoton.Substring(5));
+                        var tipo = new TipoIncidenciaLN().ShowTipos(soloActivos: true).FirstOrDefault(t => t.IdTipoIncidencia == idTipo);
+                        if (tipo == null)
+                        {
+                            await botClient.SendMessage(chatId, "Ese tipo ya no está disponible. Elige otro de la lista o escribe /cancelar.");
+                            return;
+                        }
+                        estado.IdTipoIncidencia = tipo.IdTipoIncidencia;
+                        estado.TipoIncidencia = tipo.Nombre;
                         estado.Paso = 3;
 
                         await botClient.EditMessageText(chatId, callbackQuery.Message.MessageId, $"✅ Tipo seleccionado: {estado.TipoIncidencia}");
@@ -528,6 +612,11 @@ namespace Bot
                 if (usuario == null)
                 {
                     await botClient.SendMessage(chatId, "Primero debes vincular tu cuenta con /registrar usuario contraseña.");
+                    return;
+                }
+                if (!usuario.Estado)
+                {
+                    await botClient.SendMessage(chatId, "Tu cuenta está desactivada. Comunícate con la Unidad de Tecnología.");
                     return;
                 }
 
@@ -613,6 +702,8 @@ namespace Bot
                 0,
                 null, null, null
             );
+            nueva.IdTipoIncidencia = estado.IdTipoIncidencia;
+            nueva.IdUsuarioReporta = usuario.IdUsuario;
 
             new IncidenciaLN().InsertIncidencia(nueva, out int idIncidencia);
 
@@ -630,12 +721,12 @@ namespace Bot
                     .ToList();
 
                 string mensajeTecnicos = $"🚨 *NUEVA INCIDENCIA DESDE TELEGRAM* 🚨\n\n" +
-                                         $"*Ticket:* {numeroTicket}\n" +
-                                         $"*Empleado:* {ultimaInsertada.Empleado}\n" +
-                                         $"*Área:* {ultimaInsertada.NombreArea}\n" +
-                                         $"*Tipo:* {ultimaInsertada.TipoIncidencia}\n" +
-                                         $"*Prioridad:* {ultimaInsertada.NombrePrioridad}\n\n" +
-                                         $"*Descripción:*\n{ultimaInsertada.Descripcion}";
+                                         $"*Ticket:* {Md(numeroTicket)}\n" +
+                                         $"*Empleado:* {Md(ultimaInsertada.Empleado)}\n" +
+                                         $"*Área:* {Md(ultimaInsertada.NombreArea)}\n" +
+                                         $"*Tipo:* {Md(ultimaInsertada.TipoIncidencia)}\n" +
+                                         $"*Prioridad:* {Md(ultimaInsertada.NombrePrioridad)}\n\n" +
+                                         $"*Descripción:*\n{Md(ultimaInsertada.Descripcion)}";
 
                 foreach (var tecnico in tecnicos)
                 {
@@ -646,6 +737,10 @@ namespace Bot
                         if (messageId.HasValue)
                         {
                             new Logica.Gestion_de_Logica.IncidenciaLN().RegistrarMensajeTelegram(ultimaInsertada.IdIncidencia, tecnico.TelegramChatId.Value, messageId.Value);
+                        }
+                        else
+                        {
+                            Log.Warning("Telegram rechazó el aviso de nueva incidencia para {Tecnico}.", tecnico.Nombre);
                         }
                     }
                     catch (Exception ex)
@@ -665,8 +760,13 @@ namespace Bot
 
                 if (resultado.StartsWith("SUCCESS"))
                 {
-                    await botClient.SendMessage(chatId, $"🏁 *Ticket {nuevoEstado} exitosamente.*\n\n*Observación guardada:*\n_{observacion}_", parseMode: ParseMode.Markdown);
-                    Log.Information("Técnico [{ChatId}] cambió ticket {Id} a {Estado} con obs: {Obs}", chatId, idIncidencia, nuevoEstado, observacion);
+                    await botClient.SendMessage(chatId, $"🏁 *Ticket {nuevoEstado} exitosamente.*\n\n*Observación guardada:*\n{Md(observacion)}", parseMode: ParseMode.Markdown);
+                    Log.Information("Técnico [{ChatId}] cambió ticket {Id} a {Estado}.", chatId, idIncidencia, nuevoEstado);
+
+                    // Etapa 2: avisar a quien reportó
+                    var ticket = logica.ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia);
+                    await NotificarReportante(idIncidencia,
+                        $"ℹ️ Tu {ticket?.NumeroTicket ?? "solicitud"} ahora está {nuevoEstado}.\nObservación del técnico: {observacion}", excepto: chatId);
 
                     // Quitar los botones del mensaje original para que no se puedan volver a presionar
                     var mensajeOriginal = logica.ObtenerMensajesTelegram(idIncidencia)
@@ -760,10 +860,7 @@ namespace Bot
 
                 if (partes.Length == 1)
                 {
-                    string nombreEmpleado = $"{usuario.Nombre} {usuario.Apellido}";
-
-                    incidencia = new IncidenciaLN().ShowIncidencia()
-                        .Where(i => i.Empleado == nombreEmpleado)
+                    incidencia = new IncidenciaLN().ShowIncidenciasDelUsuario(usuario)
                         .OrderByDescending(i => i.IdIncidencia)
                         .FirstOrDefault();
 
@@ -776,6 +873,10 @@ namespace Bot
                 else if (partes.Length == 2)
                 {
                     incidencia = new IncidenciaLN().BuscarPorTicket(partes[1]);
+
+                    // Un usuario solo consulta sus propios tickets (técnicos y administradores, todos)
+                    if (incidencia != null && usuario.Rol == "Usuario" && !IncidenciaLN.EsDelUsuario(incidencia, usuario))
+                        incidencia = null;
 
                     if (incidencia == null)
                     {
@@ -818,6 +919,7 @@ namespace Bot
         {
             public int Paso { get; set; }
             public int? IdArea { get; set; }
+            public int? IdTipoIncidencia { get; set; }
             public string TipoIncidencia { get; set; }
             public string Descripcion { get; set; }
             public int? IdPrioridad { get; set; }

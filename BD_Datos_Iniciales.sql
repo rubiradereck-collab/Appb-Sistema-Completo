@@ -1,7 +1,7 @@
 /* ============================================================================
    Datos iniciales del Sistema de Incidencias APPB (PostgreSQL)
 
-   Se ejecuta UNA vez, después de BD_Completa.sql, en una base nueva.
+   Se ejecuta UNA vez, después de BD_Completa.sql y BD_Etapa2.sql, en una base nueva.
    Es seguro volver a ejecutarlo: solo inserta lo que falta.
 
    ANTES DE EJECUTAR: cambia la contraseña del administrador inicial en la
@@ -22,7 +22,7 @@ BEGIN
 
     -- Estados: el orden importa, la app móvil espera En Proceso = 2 y Resuelto/Cerrado >= 3
     INSERT INTO estados (nombre)
-    SELECT v.nombre FROM (VALUES (1, 'Pendiente'), (2, 'En Proceso'), (3, 'Resuelto'), (4, 'Cerrado')) AS v(orden, nombre)
+    SELECT v.nombre FROM (VALUES (1, 'Pendiente'), (2, 'En Proceso'), (3, 'Resuelto'), (4, 'Cerrado'), (5, 'Anulado')) AS v(orden, nombre)
     WHERE NOT EXISTS (SELECT 1 FROM estados e WHERE e.nombre = v.nombre)
     ORDER BY v.orden;
 

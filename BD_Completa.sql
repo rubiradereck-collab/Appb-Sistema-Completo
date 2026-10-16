@@ -6,6 +6,7 @@
        CREATE DATABASE dbincidencias;
        \c dbincidencias
        \i BD_Completa.sql
+       \i BD_Etapa2.sql        (catálogo de tipos, fechas de asignación, estado Anulado)
 
    Notas de la migración:
    - Los nombres de tablas, columnas y funciones van sin comillas, así que

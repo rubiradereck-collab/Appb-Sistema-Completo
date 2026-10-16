@@ -40,6 +40,32 @@ namespace Presentacion
             toolTip1.SetToolTip(button1, "Limpiar el formulario para crear una nueva área");
             toolTip1.SetToolTip(button2, "Guardar los cambios del área");
             toolTip1.SetToolTip(button3, "Eliminar el área permanentemente");
+            AgregarBotonTiposIncidencia();
+        }
+
+        // Etapa 2: acceso al catálogo de tipos de incidencia (mismo estilo que los botones de exportar)
+        private void AgregarBotonTiposIncidencia()
+        {
+            var btnTipos = new Button
+            {
+                Text = "🏷️ Tipos de incidencia",
+                Location = new Point(btnExportarExcel.Left, btnExportarExcel.Bottom + 6),
+                Size = btnExportarExcel.Size,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(21, 101, 192),
+                ForeColor = Color.White,
+                Font = btnExportarExcel.Font,
+                Anchor = btnExportarExcel.Anchor,
+                Cursor = Cursors.Hand
+            };
+            btnTipos.FlatAppearance.BorderSize = 0;
+            btnTipos.Click += (s, e) =>
+            {
+                using (var frm = new FrmTiposIncidencia(usuarioActual))
+                    frm.ShowDialog(this);
+            };
+            btnExportarExcel.Parent.Controls.Add(btnTipos);
+            toolTip1.SetToolTip(btnTipos, "Administrar el catálogo de tipos de incidencia");
         }
         private bool ValidarCampos()
         {

@@ -32,6 +32,9 @@ const NOMBRES_COLUMNAS = [
   'ChatId', 'MessageId',
   'Apellido', 'Correo', 'Usuario', 'Password', 'Rol', 'Estado', 'TelegramChatId',
   'IntentosFallidos', 'BloqueadoHasta', 'FotoPerfil',
+  // Etapa 2
+  'IdTipoIncidencia', 'IdUsuarioReporta', 'FechaAsignacion', 'FechaPrimeraRespuesta', 'EscaladoSLAProceso',
+  'Activo', 'TotalIncidencias', 'NombreUsuarioReporta',
   // Alias usados en las consultas
   'NombreEstado', 'NombrePrioridad', 'NombreTecnicoAsignado', 'TecnicoAsignado', 'TestStatus', 'Total'
 ];

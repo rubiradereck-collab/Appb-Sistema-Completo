@@ -191,7 +191,7 @@ const Incidencias = ({ filterTecnico = false }) => {
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Estado</label>
                 <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none dark:text-white">
                   <option value="">Todos los estados</option>
-                  {estados.map(e => <option key={e.IdEstado} value={e.IdEstado}>{e.Nombre}</option>)}
+                  {estados.map(e => <option key={e.IdEstado} value={e.IdEstado}>{e.NombreEstado}</option>)}
                 </select>
               </div>
               <div className="flex space-x-3">

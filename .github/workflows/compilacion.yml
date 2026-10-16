@@ -24,6 +24,16 @@ jobs:
     - name: 🔄 Restaurar paquetes NuGet (TopShelf, Serilog, BCrypt, etc.)
       run: nuget restore APPB.slnx
 
+    - name: ⚙️ Crear app.config a partir de los .example
+      # Los app.config reales llevan contraseñas y están en .gitignore;
+      # para compilar basta con las plantillas (no se usan para ejecutar).
+      shell: pwsh
+      run: |
+        Get-ChildItem -Recurse -Filter "*.config.example" | ForEach-Object {
+          $destino = $_.FullName -replace '\.example$', ''
+          if (-not (Test-Path $destino)) { Copy-Item $_.FullName $destino; Write-Host "Creado $destino" }
+        }
+
     - name: 🚀 Compilar en modo Release
       # Compila todo optimizado para producción
       run: msbuild APPB.slnx /p:Configuration=Release 

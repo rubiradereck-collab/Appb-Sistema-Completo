@@ -63,6 +63,18 @@ namespace Datos.Base_de_Datos
         public DateTime? FechaSolucion { get; set; }
         public string Observaciones { get; set; }
         public byte[] FilaVersion { get; set; }
+        public int? IdTipoIncidencia { get; set; }
+        public int? IdUsuarioReporta { get; set; }
+        public DateTime? FechaAsignacion { get; set; }
+        public DateTime? FechaPrimeraRespuesta { get; set; }
+    }
+
+    public class sp_TiposIncidencia_ListarResult
+    {
+        public int IdTipoIncidencia { get; set; }
+        public string Nombre { get; set; }
+        public bool Activo { get; set; }
+        public int TotalIncidencias { get; set; }
     }
 
     public class sp_Usuarios_ListarResult

@@ -31,7 +31,11 @@ namespace Datos.Gestion_de_Datos
                     TecnicoAsignado = Texto(dr, "tecnicoasignado"),
                     FechaSolucion = FechaNula(dr, "fechasolucion"),
                     Observaciones = Texto(dr, "observaciones"),
-                    FilaVersion = Bytes(dr, "filaversion")
+                    FilaVersion = Bytes(dr, "filaversion"),
+                    IdTipoIncidencia = EnteroNulo(dr, "idtipoincidencia"),
+                    IdUsuarioReporta = EnteroNulo(dr, "idusuarioreporta"),
+                    FechaAsignacion = FechaNula(dr, "fechaasignacion"),
+                    FechaPrimeraRespuesta = FechaNula(dr, "fechaprimerarespuesta")
                 }),
                 "Error al ejecutar el procedimiento Listar incidencias");
         }
@@ -40,7 +44,7 @@ namespace Datos.Gestion_de_Datos
         public static int InsertarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oc)
         {
             return ManejoErrores.Intentar(() => EscalarEntero(
-                "SELECT sp_incidencias_insertar(@empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @observaciones)",
+                "SELECT sp_incidencias_insertar(@empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @observaciones, @idtipo, @idreporta)",
                 P("empleado", NpgsqlDbType.Varchar, oc.Empleado),
                 P("idarea", NpgsqlDbType.Integer, oc.IdArea),
                 P("tipo", NpgsqlDbType.Varchar, oc.TipoIncidencia),
@@ -48,7 +52,9 @@ namespace Datos.Gestion_de_Datos
                 P("idprioridad", NpgsqlDbType.Integer, oc.IdPrioridad),
                 P("idestado", NpgsqlDbType.Integer, oc.IdEstado),
                 P("idtecnico", NpgsqlDbType.Integer, oc.IdTecnicoAsignado),
-                P("observaciones", NpgsqlDbType.Text, oc.Observaciones)),
+                P("observaciones", NpgsqlDbType.Text, oc.Observaciones),
+                P("idtipo", NpgsqlDbType.Integer, oc.IdTipoIncidencia),
+                P("idreporta", NpgsqlDbType.Integer, oc.IdUsuarioReporta)),
                 "Error al insertar en la tabla Incidencias");
         }
 
@@ -59,7 +65,7 @@ namespace Datos.Gestion_de_Datos
         public static bool ModificarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oc)
         {
             return ManejoErrores.Intentar(() => EscalarEntero(
-                "SELECT sp_incidencias_modificar(@id, @empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @fechasolucion, @observaciones, @filaversion)",
+                "SELECT sp_incidencias_modificar(@id, @empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @fechasolucion, @observaciones, @filaversion, @idtipo)",
                 P("id", NpgsqlDbType.Integer, oc.IdIncidencia),
                 P("empleado", NpgsqlDbType.Varchar, oc.Empleado),
                 P("idarea", NpgsqlDbType.Integer, oc.IdArea),
@@ -70,7 +76,8 @@ namespace Datos.Gestion_de_Datos
                 P("idtecnico", NpgsqlDbType.Integer, oc.IdTecnicoAsignado),
                 P("fechasolucion", NpgsqlDbType.Timestamp, oc.FechaSolucion),
                 P("observaciones", NpgsqlDbType.Text, oc.Observaciones),
-                P("filaversion", NpgsqlDbType.Bytea, oc.FilaVersion)) > 0,
+                P("filaversion", NpgsqlDbType.Bytea, oc.FilaVersion),
+                P("idtipo", NpgsqlDbType.Integer, oc.IdTipoIncidencia)) > 0,
                 "Error al modificar en la tabla Incidencias");
         }
 

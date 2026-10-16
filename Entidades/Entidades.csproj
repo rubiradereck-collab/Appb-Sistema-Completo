@@ -60,6 +60,7 @@
     <Compile Include="Gestion de Entidades\Guia.cs" />
     <Compile Include="Gestion de Entidades\Incidencia.cs" />
     <Compile Include="Gestion de Entidades\Prioridad.cs" />
+    <Compile Include="Gestion de Entidades\TipoIncidencia.cs" />
     <Compile Include="Gestion de Entidades\Usuario.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

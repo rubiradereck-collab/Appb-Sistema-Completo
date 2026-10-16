@@ -18,6 +18,11 @@ namespace Logica.Gestion_de_Logica
         private const string ESTADO_EN_PROCESO = "En Proceso"; // Agregado para el bot
         private const string ESTADO_RESUELTO = "Resuelto";
         private const string ESTADO_CERRADO = "Cerrado";
+        private const string ESTADO_ANULADO = "Anulado";
+
+        private const string ROL_ADMIN = "Administrador";
+        private const string ROL_TECNICO = "Técnico";
+        private const string ROL_USUARIO = "Usuario";
 
         public List<Incidencia> ShowIncidencia()
         {
@@ -51,6 +56,10 @@ namespace Logica.Gestion_de_Logica
                     // Necesario para el control de concurrencia al modificar (antes no se copiaba
                     // y la edición siempre se reportaba como conflicto).
                     oc.FilaVersion = obj.FilaVersion;
+                    oc.IdTipoIncidencia = obj.IdTipoIncidencia;
+                    oc.IdUsuarioReporta = obj.IdUsuarioReporta;
+                    oc.FechaAsignacion = obj.FechaAsignacion;
+                    oc.FechaPrimeraRespuesta = obj.FechaPrimeraRespuesta;
 
                     lista.Add(oc);
                 }
@@ -72,6 +81,7 @@ namespace Logica.Gestion_de_Logica
             try
             {
                 ValidarIncidencia(oe);
+                AplicarTipoDelCatalogo(oe, soloActivos: true);
                 oe.IdEstado = ObtenerIdEstadoPorNombre(ESTADO_PENDIENTE);
                 idGenerado = IncidenciaCD.InsertarIncidencia(oe);
                 return idGenerado > 0;
@@ -83,11 +93,60 @@ namespace Logica.Gestion_de_Logica
             }
         }
 
+        /// <summary>
+        /// Modifica aplicando las reglas de cada rol (Etapa 2):
+        /// - Usuario: no cambia el estado ni el técnico.
+        /// - Técnico: solo puede tomar un ticket sin asignar (para sí mismo), solo cambia el
+        ///   estado de los tickets asignados a él y no puede anular.
+        /// - Administrador: sin restricciones.
+        /// </summary>
+        public bool UpdateIncidencia(Incidencia oe, Usuario actor)
+        {
+            if (actor == null) throw new LogicaExcepciones("No se indicó el usuario que realiza el cambio.", null);
+
+            Incidencia actual = ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == oe.IdIncidencia);
+            if (actual == null) throw new LogicaExcepciones("La incidencia ya no existe.", null);
+
+            bool cambiaEstado = actual.IdEstado != oe.IdEstado;
+            bool cambiaTecnico = actual.IdTecnicoAsignado != oe.IdTecnicoAsignado;
+
+            if (actor.Rol == ROL_USUARIO)
+            {
+                if (cambiaEstado || cambiaTecnico)
+                    throw new LogicaExcepciones("Tu rol no permite cambiar el estado ni el técnico de una incidencia.", null);
+                if (!EsDelUsuario(actual, actor))
+                    throw new LogicaExcepciones("Solo puedes modificar las incidencias que tú reportaste.", null);
+            }
+            else if (actor.Rol == ROL_TECNICO)
+            {
+                if (cambiaTecnico)
+                {
+                    bool seLaAsigna = actual.IdTecnicoAsignado == null && oe.IdTecnicoAsignado == actor.IdUsuario;
+                    if (!seLaAsigna)
+                        throw new LogicaExcepciones("Solo un administrador puede asignar o reasignar incidencias a otro técnico.", null);
+                }
+                if (cambiaEstado)
+                {
+                    if (oe.IdTecnicoAsignado != actor.IdUsuario)
+                        throw new LogicaExcepciones("Solo el técnico asignado puede cambiar el estado de esta incidencia.", null);
+                    if (oe.IdEstado == ObtenerIdEstadoPorNombre(ESTADO_ANULADO))
+                        throw new LogicaExcepciones("Solo un administrador puede anular una incidencia.", null);
+                }
+            }
+            else if (actor.Rol != ROL_ADMIN)
+            {
+                throw new LogicaExcepciones("Rol no reconocido.", null);
+            }
+
+            return UpdateIncidencia(oe);
+        }
+
         public bool UpdateIncidencia(Incidencia oe)
         {
             try
             {
                 ValidarIncidencia(oe);
+                AplicarTipoDelCatalogo(oe, soloActivos: false);
 
                 List<sp_Estados_ListarResult> estados = EstadoCD.ListarEstados();
                 int idResuelto = ObtenerIdEstadoPorNombre(estados, ESTADO_RESUELTO);
@@ -102,6 +161,11 @@ namespace Logica.Gestion_de_Logica
                 if (esResueltaOCerrada && oe.FechaSolucion == null)
                 {
                     oe.FechaSolucion = DateTime.Now;
+                }
+                else if (!esResueltaOCerrada)
+                {
+                    // Reabierta o anulada: no tiene fecha de solución (la BD también lo garantiza)
+                    oe.FechaSolucion = null;
                 }
 
                 return IncidenciaCD.ModificarIncidencia(oe);
@@ -166,6 +230,58 @@ namespace Logica.Gestion_de_Logica
             if (!usuario.Estado) throw new LogicaExcepciones("El técnico asignado está inactivo.", null);
         }
 
+        /// <summary>
+        /// Si llega IdTipoIncidencia, comprueba que exista (y esté activo al crear) y copia su nombre.
+        /// Sin Id (versión anterior), se deja el texto: la BD lo enlaza con el catálogo si coincide.
+        /// </summary>
+        private void AplicarTipoDelCatalogo(Incidencia oe, bool soloActivos)
+        {
+            if (!oe.IdTipoIncidencia.HasValue) return;
+
+            var tipo = TipoIncidenciaCD.ListarTipos(false).FirstOrDefault(t => t.IdTipoIncidencia == oe.IdTipoIncidencia.Value);
+            if (tipo == null) throw new LogicaExcepciones("El tipo de incidencia seleccionado no existe.", null);
+            if (soloActivos && !tipo.Activo) throw new LogicaExcepciones($"El tipo '{tipo.Nombre}' está desactivado. Elige otro.", null);
+            oe.TipoIncidencia = tipo.Nombre;
+        }
+
+        /// <summary>
+        /// ¿La incidencia la reportó este usuario? Primero por IdUsuarioReporta; en tickets
+        /// antiguos sin ese dato, por el nombre (como se hacía antes de la Etapa 2).
+        /// </summary>
+        public static bool EsDelUsuario(Incidencia inc, Usuario usuario)
+        {
+            if (inc == null || usuario == null) return false;
+            if (inc.IdUsuarioReporta.HasValue) return inc.IdUsuarioReporta.Value == usuario.IdUsuario;
+
+            string nombre = $"{usuario.Nombre} {usuario.Apellido}".Trim();
+            return string.Equals((inc.Empleado ?? "").Trim(), nombre, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public List<Incidencia> ShowIncidenciasDelUsuario(Usuario usuario)
+        {
+            return ShowIncidencia().Where(i => EsDelUsuario(i, usuario)).ToList();
+        }
+
+        /// <summary>
+        /// Id del usuario cuyo nombre completo coincide con el empleado escrito, solo si hay
+        /// exactamente uno (con dos homónimos no se adivina y se devuelve null).
+        /// </summary>
+        public int? BuscarIdUsuarioPorNombre(string empleado)
+        {
+            if (string.IsNullOrWhiteSpace(empleado)) return null;
+            try
+            {
+                var coincidencias = UsuarioCD.ListarUsuarios()
+                    .Where(u => string.Equals($"{(u.Nombre ?? "").Trim()} {(u.Apellido ?? "").Trim()}", empleado.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                return coincidencias.Count == 1 ? coincidencias[0].IdUsuario : (int?)null;
+            }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al buscar el usuario que reporta", ex);
+            }
+        }
+
         public Incidencia BuscarPorTicket(string numeroTicket)
         {
             try
@@ -224,7 +340,7 @@ namespace Logica.Gestion_de_Logica
                 if (tecnico == null) return "❌ Usuario no encontrado o no vinculado.";
 
                 var incidenciaActual = ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia);
-                if (incidenciaActual != null && (incidenciaActual.NombreEstado == "Resuelto" || incidenciaActual.NombreEstado == "Cerrado"))
+                if (incidenciaActual != null && (incidenciaActual.NombreEstado == ESTADO_RESUELTO || incidenciaActual.NombreEstado == ESTADO_CERRADO || incidenciaActual.NombreEstado == ESTADO_ANULADO))
                 {
                     return $"⚠️ Este ticket ya estaba marcado como '{incidenciaActual.NombreEstado}'. No se repitió la acción.";
                 }

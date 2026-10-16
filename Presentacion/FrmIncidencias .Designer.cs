@@ -51,7 +51,7 @@
             this.cboEstado = new System.Windows.Forms.ComboBox();
             this.cboPrioridad = new System.Windows.Forms.ComboBox();
             this.cboArea = new System.Windows.Forms.ComboBox();
-            this.txtTipo = new System.Windows.Forms.TextBox();
+            this.cboTipo = new System.Windows.Forms.ComboBox();
             this.txtEmpleado = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
@@ -122,7 +122,7 @@
             this.panelFormulario.Controls.Add(this.cboEstado);
             this.panelFormulario.Controls.Add(this.cboPrioridad);
             this.panelFormulario.Controls.Add(this.cboArea);
-            this.panelFormulario.Controls.Add(this.txtTipo);
+            this.panelFormulario.Controls.Add(this.cboTipo);
             this.panelFormulario.Controls.Add(this.txtEmpleado);
             this.panelFormulario.Controls.Add(this.label8);
             this.panelFormulario.Controls.Add(this.label6);
@@ -361,15 +361,17 @@
             this.cboArea.Size = new System.Drawing.Size(121, 36);
             this.cboArea.TabIndex = 11;
             // 
-            // txtTipo
+            // cboTipo
             // 
-            this.txtTipo.BackColor = System.Drawing.SystemColors.Window;
-            this.txtTipo.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtTipo.ForeColor = System.Drawing.Color.Black;
-            this.txtTipo.Location = new System.Drawing.Point(165, 142);
-            this.txtTipo.Name = "txtTipo";
-            this.txtTipo.Size = new System.Drawing.Size(121, 34);
-            this.txtTipo.TabIndex = 10;
+            this.cboTipo.BackColor = System.Drawing.SystemColors.Window;
+            this.cboTipo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboTipo.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.cboTipo.ForeColor = System.Drawing.Color.Black;
+            this.cboTipo.FormattingEnabled = true;
+            this.cboTipo.Location = new System.Drawing.Point(165, 142);
+            this.cboTipo.Name = "cboTipo";
+            this.cboTipo.Size = new System.Drawing.Size(121, 36);
+            this.cboTipo.TabIndex = 10;
             // 
             // txtEmpleado
             // 
@@ -489,7 +491,7 @@
 
         private System.Windows.Forms.DataGridView grid;
         private System.Windows.Forms.Panel panelFormulario;
-        private System.Windows.Forms.TextBox txtTipo;
+        private System.Windows.Forms.ComboBox cboTipo;
         private System.Windows.Forms.TextBox txtEmpleado;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Label label6;

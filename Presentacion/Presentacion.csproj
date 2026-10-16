@@ -120,6 +120,9 @@
     <Compile Include="FrmAreas.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FrmTiposIncidencia.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="FrmAreas.Designer.cs">
       <DependentUpon>FrmAreas.cs</DependentUpon>
     </Compile>

@@ -25,6 +25,8 @@ namespace Presentacion
         private readonly PrioridadLN prioridadLN = new PrioridadLN();
         private readonly EstadoLN estadoLN = new EstadoLN();
         private readonly UsuarioLN usuarioLN = new UsuarioLN();
+        private readonly TipoIncidenciaLN tipoIncidenciaLN = new TipoIncidenciaLN();
+        private List<TipoIncidencia> tiposTodos = new List<TipoIncidencia>();
         private readonly Usuario usuarioActual;
         private readonly System.Windows.Forms.Timer tmrRefresco = new System.Windows.Forms.Timer { Interval = 15000 };
         private List<Incidencia> listaIncidencias;
@@ -95,9 +97,9 @@ namespace Presentacion
                 esValido = false;
             }
 
-            if (string.IsNullOrWhiteSpace(txtTipo.Text))
+            if (cboTipo.SelectedValue == null)
             {
-                errorProvider1.SetError(txtTipo, "Este campo es obligatorio.");
+                errorProvider1.SetError(cboTipo, "Selecciona el tipo de incidencia.");
                 esValido = false;
             }
 
@@ -113,6 +115,8 @@ namespace Presentacion
         {
             if (usuarioActual.Rol == "Usuario")
             {
+                // Un usuario solo reporta a su propio nombre
+                txtEmpleado.ReadOnly = true;
                 cboEstado.Enabled = false;
                 cboTecnico.Enabled = false;
                 DeshabilitarBoton(btnEliminar);
@@ -142,6 +146,9 @@ namespace Presentacion
             cboPrioridad.DisplayMember = "Nombre";
             cboPrioridad.ValueMember = "IdPrioridad";
 
+            tiposTodos = tipoIncidenciaLN.ShowTipos();
+            CargarTipos(null);
+
             cboEstado.DataSource = estadoLN.ShowEstado();
             cboEstado.DisplayMember = "Nombre";
             cboEstado.ValueMember = "IdEstado";
@@ -156,6 +163,22 @@ namespace Presentacion
             cboTecnico.ValueMember = "IdUsuario";
         }
 
+        /// <summary>
+        /// Llena el combo de tipos con los activos. Si el ticket abierto tiene un tipo que ya
+        /// se desactivó, se agrega también para no perderlo al guardar.
+        /// </summary>
+        private void CargarTipos(int? idTipoDelTicket)
+        {
+            var tipos = tiposTodos
+                .Where(t => t.Activo || (idTipoDelTicket.HasValue && t.IdTipoIncidencia == idTipoDelTicket.Value))
+                .ToList();
+
+            cboTipo.DataSource = null;
+            cboTipo.DisplayMember = "Nombre";
+            cboTipo.ValueMember = "IdTipoIncidencia";
+            cboTipo.DataSource = tipos;
+        }
+
         private void CargarGrid()
         {
             try
@@ -164,9 +187,8 @@ namespace Presentacion
 
                 if (usuarioActual.Rol == "Usuario")
                 {
-                    string nombreCompleto = $"{usuarioActual.Nombre} {usuarioActual.Apellido}";
                     listaIncidenciasCompleta = listaIncidenciasCompleta
-                        .Where(i => i.Empleado == nombreCompleto)
+                        .Where(i => IncidenciaLN.EsDelUsuario(i, usuarioActual))
                         .ToList();
                 }
 
@@ -218,7 +240,7 @@ namespace Presentacion
 
         private void AplicarFormatoColumnas()
         {
-            foreach (string columna in new[] { "IdIncidencia", "IdArea", "IdPrioridad", "IdEstado", "IdTecnicoAsignado", "Descripcion", "Observaciones", "FilaVersion" })
+            foreach (string columna in new[] { "IdIncidencia", "IdArea", "IdPrioridad", "IdEstado", "IdTecnicoAsignado", "Descripcion", "Observaciones", "FilaVersion", "IdTipoIncidencia", "IdUsuarioReporta" })
             {
                 if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
             }
@@ -230,6 +252,8 @@ namespace Presentacion
             if (grid.Columns["NombreEstado"] != null) grid.Columns["NombreEstado"].HeaderText = "Estado";
             if (grid.Columns["TecnicoAsignado"] != null) grid.Columns["TecnicoAsignado"].HeaderText = "Técnico";
             if (grid.Columns["FechaSolucion"] != null) grid.Columns["FechaSolucion"].HeaderText = "Fecha Solución";
+            if (grid.Columns["FechaAsignacion"] != null) grid.Columns["FechaAsignacion"].HeaderText = "Asignada";
+            if (grid.Columns["FechaPrimeraRespuesta"] != null) grid.Columns["FechaPrimeraRespuesta"].HeaderText = "1.ª Respuesta";
 
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
@@ -242,7 +266,11 @@ namespace Presentacion
             if (incidenciaSeleccionada == null) return;
 
             txtEmpleado.Text = incidenciaSeleccionada.Empleado;
-            txtTipo.Text = incidenciaSeleccionada.TipoIncidencia;
+            CargarTipos(incidenciaSeleccionada.IdTipoIncidencia);
+            if (incidenciaSeleccionada.IdTipoIncidencia.HasValue)
+                cboTipo.SelectedValue = incidenciaSeleccionada.IdTipoIncidencia.Value;
+            else
+                cboTipo.SelectedIndex = -1; // texto antiguo que no está en el catálogo: hay que elegir uno
             txtDescripcion.Text = incidenciaSeleccionada.Descripcion;
             txtObservaciones.Text = incidenciaSeleccionada.Observaciones;
 
@@ -270,7 +298,9 @@ namespace Presentacion
 
             incidenciaSeleccionada = null;
             txtEmpleado.Clear();
-            txtTipo.Clear();
+            if (usuarioActual.Rol == "Usuario") txtEmpleado.Text = $"{usuarioActual.Nombre} {usuarioActual.Apellido}";
+            CargarTipos(null);
+            if (cboTipo.Items.Count > 0) cboTipo.SelectedIndex = 0;
             txtDescripcion.Clear();
             txtObservaciones.Clear();
             if (cboArea.Items.Count > 0) cboArea.SelectedIndex = 0;
@@ -305,6 +335,7 @@ namespace Presentacion
                         empleado = inc.Empleado ?? "",
                         tipoIncidencia = inc.TipoIncidencia ?? "",
                         descripcion = inc.Descripcion ?? "",
+                        idActor = usuarioActual.IdUsuario, // para no avisarle de su propio cambio
                         origen = "Escritorio"
                     };
                     
@@ -323,11 +354,15 @@ namespace Presentacion
             }
         }
 
-        private async Task EnviarNotificacionSiCorresponde(Incidencia incidencia, string nombreEstadoNuevo)
+        // Etapa 2: avisa por Telegram al asignar un técnico y en cada cambio de estado
+        // (la API avisa al técnico asignado y a quien reportó el ticket).
+        private async Task EnviarNotificacionesDeCambio(Incidencia incidencia, int? tecnicoAnterior, int estadoAnterior, string nombreEstadoNuevo)
         {
-            if (nombreEstadoNuevo != "Resuelto" && nombreEstadoNuevo != "Cerrado") return;
-            if (!incidencia.IdTecnicoAsignado.HasValue) return;
-            await NotificarA_NodeAPI("estado", incidencia, nombreEstadoNuevo);
+            if (incidencia.IdTecnicoAsignado.HasValue && incidencia.IdTecnicoAsignado != tecnicoAnterior)
+                await NotificarA_NodeAPI("asignar", incidencia, nombreEstadoNuevo);
+
+            if (incidencia.IdEstado != estadoAnterior)
+                await NotificarA_NodeAPI("estado", incidencia, nombreEstadoNuevo);
         }
 
         private async Task NotificarNuevaIncidenciaATecnicosAsync(Incidencia incidenciaNueva)
@@ -349,9 +384,14 @@ namespace Presentacion
                 {
                     Incidencia nueva = new Incidencia(
                         0, null, DateTime.Now, txtEmpleado.Text, (int)cboArea.SelectedValue,
-                        txtTipo.Text, txtDescripcion.Text, (int)cboPrioridad.SelectedValue,
+                        cboTipo.Text, txtDescripcion.Text, (int)cboPrioridad.SelectedValue,
                         (int)cboEstado.SelectedValue, idTecnico, null, txtObservaciones.Text
                     );
+                    nueva.IdTipoIncidencia = (int)cboTipo.SelectedValue;
+                    // Quién reporta: el propio usuario, o el usuario cuyo nombre se escribió (si es único)
+                    nueva.IdUsuarioReporta = usuarioActual.Rol == "Usuario"
+                        ? usuarioActual.IdUsuario
+                        : incidenciaLN.BuscarIdUsuarioPorNombre(txtEmpleado.Text);
                     incidenciaLN.InsertIncidencia(nueva, out int idIncidencia);
 
                     auditoriaLN.Registrar(
@@ -360,7 +400,7 @@ namespace Presentacion
                         "Crear",
                         "Incidencia",
                         null,
-                        $"Empleado: {txtEmpleado.Text} | Tipo: {txtTipo.Text}"
+                        $"Empleado: {txtEmpleado.Text} | Tipo: {cboTipo.Text}"
                     );
 
                     // NUEVO: Buscar la incidencia recién creada para tener su número de ticket real
@@ -376,17 +416,31 @@ namespace Presentacion
                 else
                 {
                     string estadoAnterior = incidenciaSeleccionada.NombreEstado;
+                    int idEstadoAnterior = incidenciaSeleccionada.IdEstado;
+                    int? tecnicoAnterior = incidenciaSeleccionada.IdTecnicoAsignado;
 
                     incidenciaSeleccionada.Empleado = txtEmpleado.Text;
                     incidenciaSeleccionada.IdArea = (int)cboArea.SelectedValue;
-                    incidenciaSeleccionada.TipoIncidencia = txtTipo.Text;
+                    incidenciaSeleccionada.TipoIncidencia = cboTipo.Text;
+                    incidenciaSeleccionada.IdTipoIncidencia = (int)cboTipo.SelectedValue;
                     incidenciaSeleccionada.Descripcion = txtDescripcion.Text;
                     incidenciaSeleccionada.IdPrioridad = (int)cboPrioridad.SelectedValue;
                     incidenciaSeleccionada.IdEstado = (int)cboEstado.SelectedValue;
                     incidenciaSeleccionada.IdTecnicoAsignado = idTecnico;
                     incidenciaSeleccionada.Observaciones = txtObservaciones.Text;
 
-                    bool actualizado = incidenciaLN.UpdateIncidencia(incidenciaSeleccionada);
+                    bool actualizado;
+                    try
+                    {
+                        actualizado = incidenciaLN.UpdateIncidencia(incidenciaSeleccionada, usuarioActual);
+                    }
+                    catch
+                    {
+                        // La fila del grid quedó con los valores rechazados: se recarga para no mostrarlos
+                        CargarGrid();
+                        LimpiarFormulario();
+                        throw;
+                    }
 
                     if (!actualizado)
                     {
@@ -408,7 +462,7 @@ namespace Presentacion
                         incidenciaSeleccionada.IdIncidencia,
                         $"Ticket: {incidenciaSeleccionada.NumeroTicket} | Estado: {estadoAnterior} → {nuevoEstado}"
                     );
-                    _ = EnviarNotificacionSiCorresponde(incidenciaSeleccionada, nuevoEstado);
+                    _ = EnviarNotificacionesDeCambio(incidenciaSeleccionada, tecnicoAnterior, idEstadoAnterior, nuevoEstado);
                 }
 
                 CargarGrid();

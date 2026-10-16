@@ -31,7 +31,8 @@ const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil",
        req.input('IdTecnico', sql.Int, idTecnicoAsignado);
     }
     const tecnicos = await req.query(query);
-    const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
+    const ticket = incidencia.NumeroTicket || `#${incidencia.IdIncidencia}`;
+    const mensaje = `🆕 Nueva incidencia ${ticket} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
     const reply_markup = idTecnicoAsignado ? null : { inline_keyboard: [[{ text: "Aceptar ticket", callback_data: `aceptar_${incidencia.IdIncidencia}` }]] };
     for (const t of tecnicos.recordset) {
       const messageId = await enviarTelegram(t.TelegramChatId, mensaje, reply_markup);
@@ -50,21 +51,46 @@ const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil",
   }
 };
 
-const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecnicoId, nuevoValor) => {
+// Etapa 2: al asignar se avisa al técnico y a quien reportó; al cambiar de estado,
+// al técnico asignado y a quien reportó. Nunca se avisa a quien hizo el cambio.
+// Los mensajes van en texto plano (sin parse_mode), así que no hace falta escapar nada.
+const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, _tecnicoId, _nuevoValor, idActor = null) => {
   try {
-    if (!tecnicoId) return;
-    const userRes = await pool.request().input('Id', sql.Int, tecnicoId).query("SELECT TelegramChatId FROM Usuarios WHERE IdUsuario = @Id");
-    const chatId = userRes.recordset[0]?.TelegramChatId;
-    if (!chatId) return;
+    const r = await pool.request().input('Id', sql.Int, incidenciaId).query(`
+      SELECT i.NumeroTicket, e.Nombre AS NombreEstado, i.Observaciones,
+             t.IdUsuario AS IdTecnico, t.Nombre || ' ' || t.Apellido AS NombreTecnico,
+             CASE WHEN t.Estado THEN t.TelegramChatId END AS ChatTecnico,
+             u.IdUsuario AS IdReporta,
+             CASE WHEN u.Estado THEN u.TelegramChatId END AS ChatReporta
+      FROM Incidencias i
+      JOIN Estados e ON e.IdEstado = i.IdEstado
+      LEFT JOIN Usuarios t ON t.IdUsuario = i.IdTecnicoAsignado
+      LEFT JOIN Usuarios u ON u.IdUsuario = i.IdUsuarioReporta
+      WHERE i.IdIncidencia = @Id`);
+    const inc = r.recordset[0];
+    if (!inc) return;
+    // Nombres en minúsculas porque los alias de esta consulta no están en el mapa de columnas
+    const ticket = inc.NumeroTicket;
+    const estado = inc.NombreEstado;
+    const tecnico = { id: inc.idtecnico, nombre: inc.nombretecnico, chat: inc.chattecnico };
+    const reporta = { id: inc.idreporta, chat: inc.chatreporta };
 
-    let mensaje = '';
+    const avisos = [];
     if (accion === 'asignar') {
-      mensaje = `🔔 Se te ha asignado la Incidencia #${incidenciaId}`;
+      avisos.push([tecnico, `🔔 Se te asignó la ${ticket}.`]);
+      avisos.push([reporta, `🔔 Tu ${ticket} fue asignada a ${tecnico.nombre || 'un técnico'}.`]);
     } else if (accion === 'estado') {
-      mensaje = `ℹ️ Incidencia #${incidenciaId} marcada como ${nuevoValor}`;
+      avisos.push([tecnico, `ℹ️ La ${ticket} ahora está ${estado}.`]);
+      const obs = inc.Observaciones ? `\nObservación: ${inc.Observaciones}` : '';
+      avisos.push([reporta, `ℹ️ Tu ${ticket} ahora está ${estado}.${obs}`]);
     }
-    
-    if (mensaje) await enviarTelegram(chatId, mensaje);
+
+    const enviados = new Set();
+    for (const [destino, texto] of avisos) {
+      if (!destino.chat || destino.id === idActor || enviados.has(String(destino.chat))) continue;
+      enviados.add(String(destino.chat));
+      await enviarTelegram(destino.chat, texto);
+    }
   } catch (err) {
     console.error('Error al notificar actualizacion', err);
   }
@@ -254,7 +280,7 @@ app.post('/api/interno/notificar', async (req, res) => {
     return res.status(403).json({ message: 'No autorizado' });
   }
   try {
-    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen } = req.body;
+    const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen, idActor } = req.body;
     const pool = await getDb();
 
     if (tipoEvento === 'nueva') {
@@ -266,9 +292,9 @@ app.post('/api/interno/notificar', async (req, res) => {
       };
       await notificarNuevaIncidencia(pool, mockIncidencia, origen || 'Escritorio', idTecnicoAsignado);
     } else if (tipoEvento === 'asignar') {
-      await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null);
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'asignar', idTecnicoAsignado, null, idActor || null);
     } else if (tipoEvento === 'estado') {
-      await notificarActualizacionIncidencia(pool, idIncidencia, 'estado', idTecnicoAsignado, nuevoEstado);
+      await notificarActualizacionIncidencia(pool, idIncidencia, 'estado', idTecnicoAsignado, nuevoEstado, idActor || null);
     }
     
     return res.status(200).json({ message: 'Notificaciones enviadas' });
@@ -321,6 +347,30 @@ async function registrarAuditoria(pool, req, accion, idRef, detalles, entidad = 
   }
 }
 
+// ===== Etapa 2: reglas compartidas =====
+const ROLES_VALIDOS = ["Administrador", "Técnico", "Usuario"];
+
+// Condición SQL "esta incidencia la reportó el usuario autenticado": por IdUsuarioReporta y,
+// en tickets antiguos sin ese dato, por el nombre (como antes). Agrega los parámetros al request.
+async function filtroReportante(pool, request, req, alias = "i") {
+  const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
+  request.input("IdYo", sql.Int, req.user.IdUsuario);
+  request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
+  return `(${alias}.IdUsuarioReporta = @IdYo OR (${alias}.IdUsuarioReporta IS NULL AND LOWER(LTRIM(RTRIM(${alias}.Empleado))) = @NombreCompleto))`;
+}
+
+async function obtenerEstados(pool) {
+  const r = await pool.request().query("SELECT IdEstado, Nombre FROM Estados");
+  const porNombre = (n) => r.recordset.find(e => e.Nombre === n)?.IdEstado;
+  return { lista: r.recordset, porNombre };
+}
+
+const aEntero = (v) => {
+  if (v === undefined || v === null || v === "") return null;
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? NaN : n;
+};
+
 app.get("/api/areas", async (req, res) => {
   try {
     const pool = await getDb();
@@ -361,7 +411,7 @@ app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
 app.get("/api/prioridades", async (req, res) => {
   try {
     const pool = await getDb();
-    const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades");
+    const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades ORDER BY IdPrioridad");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
 });
@@ -369,8 +419,95 @@ app.get("/api/prioridades", async (req, res) => {
 app.get("/api/estados", async (req, res) => {
   try {
     const pool = await getDb();
-    const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados");
+    const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados ORDER BY IdEstado");
     res.json(result.recordset);
+  } catch (err) { responderError(res, err); }
+});
+
+// ===== Catálogo de tipos de incidencia (Etapa 2) =====
+// ?activos=1 devuelve solo los que se ofrecen al reportar
+app.get("/api/tipos-incidencia", async (req, res) => {
+  try {
+    const pool = await getDb();
+    const r = await pool.request()
+      .input("Solo", sql.Bit, req.query.activos === "1" || req.query.activos === "true")
+      .query("SELECT * FROM sp_tiposincidencia_listar(@Solo)");
+    res.json(r.recordset);
+  } catch (err) { responderError(res, err); }
+});
+
+const validarNombreTipo = (nombre) => {
+  const n = (nombre || "").trim();
+  if (!n || n.length > 100) return null;
+  return n;
+};
+
+app.post("/api/tipos-incidencia", requireAdmin, async (req, res) => {
+  try {
+    const nombre = validarNombreTipo(req.body.Nombre);
+    if (!nombre) return res.status(400).json({ message: "El nombre del tipo es obligatorio (máximo 100 caracteres)." });
+    const activo = req.body.Activo === undefined ? true : !!req.body.Activo;
+    const pool = await getDb();
+    let id;
+    try {
+      const r = await pool.request().input("Nombre", sql.VarChar, nombre).input("Activo", sql.Bit, activo)
+        .query("SELECT sp_tiposincidencia_insertar(@Nombre, @Activo) AS Id");
+      id = r.recordset[0].Id ?? r.recordset[0].id;
+    } catch (dbErr) {
+      if (dbErr.code === "23505") return res.status(409).json({ message: "Ya existe un tipo con ese nombre." });
+      throw dbErr;
+    }
+    await registrarAuditoria(pool, req, "Crear", id, `Tipo: ${nombre}`, "TipoIncidencia");
+    res.status(201).json({ id });
+  } catch (err) { responderError(res, err); }
+});
+
+app.put("/api/tipos-incidencia/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = aEntero(req.params.id);
+    const nombre = validarNombreTipo(req.body.Nombre);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    if (!nombre) return res.status(400).json({ message: "El nombre del tipo es obligatorio (máximo 100 caracteres)." });
+    const pool = await getDb();
+    const actual = (await pool.request().input("Id", sql.Int, id)
+      .query("SELECT Nombre, Activo FROM TiposIncidencia WHERE IdTipoIncidencia = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Tipo no encontrado." });
+    const activo = req.body.Activo === undefined ? actual.Activo : !!req.body.Activo;
+    if (!activo) {
+      const otros = await pool.request().input("Id", sql.Int, id)
+        .query("SELECT COUNT(*)::int AS Total FROM TiposIncidencia WHERE Activo AND IdTipoIncidencia <> @Id");
+      if (otros.recordset[0].Total === 0) return res.status(400).json({ message: "Debe quedar al menos un tipo activo." });
+    }
+    try {
+      await pool.request().input("Id", sql.Int, id).input("Nombre", sql.VarChar, nombre).input("Activo", sql.Bit, activo)
+        .query("SELECT sp_tiposincidencia_modificar(@Id, @Nombre, @Activo)");
+    } catch (dbErr) {
+      if (dbErr.code === "23505") return res.status(409).json({ message: "Ya existe un tipo con ese nombre." });
+      throw dbErr;
+    }
+    await registrarAuditoria(pool, req, "Modificar", id,
+      `Tipo: ${actual.Nombre} → ${nombre} | Activo: ${actual.Activo ? "Sí" : "No"} → ${activo ? "Sí" : "No"}`, "TipoIncidencia");
+    res.json({ success: true });
+  } catch (err) { responderError(res, err); }
+});
+
+// Si el tipo ya tiene tickets no se borra: se desactiva (eliminado = false)
+app.delete("/api/tipos-incidencia/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    const pool = await getDb();
+    const actual = (await pool.request().input("Id", sql.Int, id)
+      .query("SELECT Nombre FROM TiposIncidencia WHERE IdTipoIncidencia = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Tipo no encontrado." });
+    const otros = await pool.request().input("Id", sql.Int, id)
+      .query("SELECT COUNT(*)::int AS Total FROM TiposIncidencia WHERE Activo AND IdTipoIncidencia <> @Id");
+    if (otros.recordset[0].Total === 0) return res.status(400).json({ message: "Debe quedar al menos un tipo activo." });
+
+    const r = await pool.request().input("Id", sql.Int, id).query("SELECT sp_tiposincidencia_eliminar(@Id) AS Resultado");
+    const eliminado = (r.recordset[0].Resultado ?? r.recordset[0].resultado) === 1;
+    await registrarAuditoria(pool, req, eliminado ? "Eliminar" : "Desactivar", id, `Tipo: ${actual.Nombre}`, "TipoIncidencia");
+    res.json({ success: true, eliminado });
   } catch (err) { responderError(res, err); }
 });
 
@@ -546,19 +683,52 @@ app.get("/api/usuarios", requireAdmin, async (req, res) => {
   } catch (err) { responderError(res, err); }
 });
 
+// Mismas reglas que UsuarioLN del escritorio. Devuelve el mensaje de error o null.
+function validarDatosUsuario({ Nombre, Apellido, Correo, Usuario, Rol }) {
+  if (!Nombre || !Nombre.trim() || Nombre.trim().length > 100) return "El nombre es obligatorio (máximo 100 caracteres).";
+  if (!Apellido || !Apellido.trim() || Apellido.trim().length > 100) return "El apellido es obligatorio (máximo 100 caracteres).";
+  if (!Correo || Correo.trim().length > 150 || !REGEX_CORREO.test(Correo.trim())) return "El correo no tiene un formato válido.";
+  if (!Usuario || !Usuario.trim() || Usuario.trim().length > 50 || /\s/.test(Usuario.trim())) return "El usuario es obligatorio, sin espacios (máximo 50 caracteres).";
+  if (!ROLES_VALIDOS.includes(Rol)) return `Rol inválido. Valores permitidos: ${ROLES_VALIDOS.join(", ")}.`;
+  return null;
+}
+
+function mensajeErrorUsuarioBD(dbErr) {
+  if (dbErr.code === "23505") return "Ya existe un usuario con ese nombre de usuario o correo.";
+  if (dbErr.code === "23503") return "No se puede eliminar: el usuario tiene incidencias o registros de auditoría asociados. Desactívalo en su lugar.";
+  return null;
+}
+
 app.post("/api/usuarios", requireAdmin, async (req, res) => {
   try {
+    const datos = {
+      Nombre: req.body.Nombre, Apellido: req.body.Apellido, Correo: req.body.Correo,
+      Usuario: req.body.UsuarioLogin || req.body.Usuario, Rol: req.body.Rol
+    };
+    const error = validarDatosUsuario(datos);
+    if (error) return res.status(400).json({ message: error });
+    if (!req.body.Password || req.body.Password.length < 6) return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres." });
+
     const hash = await bcrypt.hash(req.body.Password, 10);
     const pool = await getDb();
-    const result = await pool.request()
-      .input("Nombre", sql.VarChar, req.body.Nombre)
-      .input("Apellido", sql.VarChar, req.body.Apellido)
-      .input("Correo", sql.VarChar, req.body.Correo)
-      .input("Usuario", sql.VarChar, req.body.UsuarioLogin)
-      .input("Password", sql.VarChar, hash)
-      .input("Rol", sql.VarChar, req.body.Rol)
-      .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, TRUE, 0) RETURNING IdUsuario");
-    res.status(201).json({ id: result.recordset[0].IdUsuario });
+    let result;
+    try {
+      result = await pool.request()
+        .input("Nombre", sql.VarChar, datos.Nombre.trim())
+        .input("Apellido", sql.VarChar, datos.Apellido.trim())
+        .input("Correo", sql.VarChar, datos.Correo.trim())
+        .input("Usuario", sql.VarChar, datos.Usuario.trim())
+        .input("Password", sql.VarChar, hash)
+        .input("Rol", sql.VarChar, datos.Rol)
+        .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, TRUE, 0) RETURNING IdUsuario");
+    } catch (dbErr) {
+      const msg = mensajeErrorUsuarioBD(dbErr);
+      if (msg) return res.status(409).json({ message: msg });
+      throw dbErr;
+    }
+    const id = result.recordset[0].IdUsuario;
+    await registrarAuditoria(pool, req, "Crear", id, `Usuario: ${datos.Usuario.trim()} | Rol: ${datos.Rol}`, "Usuario");
+    res.status(201).json({ id });
   } catch (err) { responderError(res, err); }
 });
 
@@ -596,6 +766,7 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         .input('Id', sql.Int, req.params.id)
         .input('Hash', sql.VarChar, hash)
         .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
+      await registrarAuditoria(pool, req, "Restablecer contraseña", req.params.id, `Contraseña temporal enviada a ${userEmail}`, "Usuario");
   
       res.json({ success: true, message: "Contraseña actualizada y correo enviado" });
     } catch (err) { responderError(res, err); }
@@ -603,32 +774,91 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
 
 app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
     const { Nombre, Apellido, Correo, UsuarioLogin, Usuario, Rol, Estado, TelegramChatId } = req.body;
-    const usr = Usuario || UsuarioLogin;
+    const datos = { Nombre, Apellido, Correo, Usuario: Usuario || UsuarioLogin, Rol };
+    const error = validarDatosUsuario(datos);
+    if (error) return res.status(400).json({ message: error });
+
     const pool = await getDb();
-    await pool.request()
-      .input("IdUsuario", sql.Int, req.params.id)
-      .input("Nombre", sql.VarChar, Nombre)
-      .input("Apellido", sql.VarChar, Apellido)
-      .input("Correo", sql.VarChar, Correo)
-      .input("Usuario", sql.VarChar, usr)
-      .input("Rol", sql.VarChar, Rol)
-      .input("Estado", sql.Bit, Estado !== undefined ? Estado : 1)
-      .input("TelegramChatId", sql.VarChar, TelegramChatId || null)
-      .query(`UPDATE Usuarios 
-              SET Nombre = @Nombre, Apellido = @Apellido, Correo = @Correo, 
-                  Usuario = @Usuario, Rol = @Rol, Estado = @Estado, TelegramChatId = @TelegramChatId 
-              WHERE IdUsuario = @IdUsuario`);
+    const actual = (await pool.request().input("Id", sql.Int, id)
+      .query("SELECT Nombre, Apellido, Correo, Usuario, Rol, Estado, TelegramChatId FROM Usuarios WHERE IdUsuario = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Usuario no encontrado." });
+
+    const estadoNuevo = Estado !== undefined ? !!Estado : true;
+    // Un administrador no puede quitarse a sí mismo el acceso ni el rol
+    if (id === req.user.IdUsuario && (!estadoNuevo || Rol !== "Administrador")) {
+      return res.status(400).json({ message: "No puedes desactivar tu propia cuenta ni quitarte el rol de Administrador." });
+    }
+    // No puede pasar a "Usuario" un técnico con tickets abiertos asignados
+    if (actual.Rol === "Técnico" && Rol !== "Técnico") {
+      const abiertos = await pool.request().input("Id", sql.Int, id).query(`
+        SELECT COUNT(*)::int AS Total FROM Incidencias i JOIN Estados e ON e.IdEstado = i.IdEstado
+        WHERE i.IdTecnicoAsignado = @Id AND e.Nombre IN ('Pendiente', 'En Proceso')`);
+      if (abiertos.recordset[0].Total > 0) {
+        return res.status(400).json({ message: `Este técnico tiene ${abiertos.recordset[0].Total} ticket(s) abierto(s). Reasígnalos antes de cambiar su rol.` });
+      }
+    }
+
+    try {
+      await pool.request()
+        .input("IdUsuario", sql.Int, id)
+        .input("Nombre", sql.VarChar, Nombre.trim())
+        .input("Apellido", sql.VarChar, Apellido.trim())
+        .input("Correo", sql.VarChar, Correo.trim())
+        .input("Usuario", sql.VarChar, datos.Usuario.trim())
+        .input("Rol", sql.VarChar, Rol)
+        .input("Estado", sql.Bit, estadoNuevo)
+        .input("TelegramChatId", sql.BigInt, TelegramChatId || null)
+        .query(`UPDATE Usuarios 
+                SET Nombre = @Nombre, Apellido = @Apellido, Correo = @Correo, 
+                    Usuario = @Usuario, Rol = @Rol, Estado = @Estado, TelegramChatId = @TelegramChatId 
+                WHERE IdUsuario = @IdUsuario`);
+    } catch (dbErr) {
+      const msg = mensajeErrorUsuarioBD(dbErr);
+      if (msg) return res.status(409).json({ message: msg });
+      throw dbErr;
+    }
+
+    // Auditoría: solo los campos que cambiaron
+    const cambios = [];
+    const comparar = (etiqueta, antes, despues) => {
+      if (String(antes ?? "") !== String(despues ?? "")) cambios.push(`${etiqueta}: ${antes ?? "—"} → ${despues ?? "—"}`);
+    };
+    comparar("Nombre", actual.Nombre, Nombre.trim());
+    comparar("Apellido", actual.Apellido, Apellido.trim());
+    comparar("Correo", actual.Correo, Correo.trim());
+    comparar("Usuario", actual.Usuario, datos.Usuario.trim());
+    comparar("Rol", actual.Rol, Rol);
+    comparar("Activo", actual.Estado ? "Sí" : "No", estadoNuevo ? "Sí" : "No");
+    comparar("Telegram", actual.TelegramChatId ? "vinculado" : "sin vincular", TelegramChatId ? "vinculado" : "sin vincular");
+    if (cambios.length > 0) {
+      await registrarAuditoria(pool, req, "Modificar", id, cambios.join(" | "), "Usuario");
+    }
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/usuarios/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    if (id === req.user.IdUsuario) return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
     const pool = await getDb();
-    await pool.request()
-      .input("IdUsuario", sql.Int, req.params.id)
-      .query("DELETE FROM Usuarios WHERE IdUsuario = @IdUsuario");
+    const actual = (await pool.request().input("Id", sql.Int, id)
+      .query("SELECT Usuario, Rol FROM Usuarios WHERE IdUsuario = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Usuario no encontrado." });
+    try {
+      await pool.request()
+        .input("IdUsuario", sql.Int, id)
+        .query("DELETE FROM Usuarios WHERE IdUsuario = @IdUsuario");
+    } catch (dbErr) {
+      const msg = mensajeErrorUsuarioBD(dbErr);
+      if (msg) return res.status(409).json({ message: msg });
+      throw dbErr;
+    }
+    await registrarAuditoria(pool, req, "Eliminar", id, `Usuario: ${actual.Usuario} | Rol: ${actual.Rol}`, "Usuario");
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
@@ -753,9 +983,7 @@ app.get("/api/incidencias", async (req, res) => {
     const request = pool.request();
     // El rol Usuario solo ve sus propias incidencias (misma regla que la app de escritorio)
     if (req.user.Rol === "Usuario") {
-      const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
-      request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
-      query += " WHERE LOWER(LTRIM(RTRIM(i.Empleado))) = @NombreCompleto";
+      query += " WHERE " + await filtroReportante(pool, request, req);
     }
     query += " ORDER BY i.Fecha DESC";
     
@@ -788,10 +1016,15 @@ app.get("/api/incidencias/:id", async (req, res) => {
       return res.status(404).json({ message: "No encontrada" });
     }
     if (req.user.Rol === "Usuario") {
-      const nombre = (await obtenerNombreCompleto(pool, req.user.IdUsuario) || "").toLowerCase();
-      if ((result.recordset[0].Empleado || "").trim().toLowerCase() !== nombre) {
-        return res.status(403).json({ message: "No tienes acceso a esta incidencia" });
+      const inc = result.recordset[0];
+      let esSuya;
+      if (inc.IdUsuarioReporta) {
+        esSuya = inc.IdUsuarioReporta === req.user.IdUsuario;
+      } else {
+        const nombre = (await obtenerNombreCompleto(pool, req.user.IdUsuario) || "").toLowerCase();
+        esSuya = (inc.Empleado || "").trim().toLowerCase() === nombre;
       }
+      if (!esSuya) return res.status(403).json({ message: "No tienes acceso a esta incidencia" });
     }
     res.json(result.recordset[0]);
   } catch (err) { responderError(res, err); }
@@ -799,17 +1032,60 @@ app.get("/api/incidencias/:id", async (req, res) => {
 
 app.post("/api/incidencias", async (req, res) => {
   try {
-    const { Descripcion, IdPrioridad, IdArea, TipoIncidencia, origen } = req.body;
-    let { Empleado } = req.body;
+    const { origen } = req.body;
+    let { Descripcion, Empleado, TipoIncidencia } = req.body;
+    const IdPrioridad = aEntero(req.body.IdPrioridad);
+    const IdArea = aEntero(req.body.IdArea);
+    const IdTipoIncidencia = aEntero(req.body.IdTipoIncidencia);
+    const pool = await getDb();
+
+    let idUsuarioReporta = null;
     if (req.user.Rol === "Usuario") {
       // Un Usuario solo puede reportar a su propio nombre
-      Empleado = await obtenerNombreCompleto(await getDb(), req.user.IdUsuario);
+      Empleado = await obtenerNombreCompleto(pool, req.user.IdUsuario);
+      idUsuarioReporta = req.user.IdUsuario;
+    } else if (Empleado) {
+      // Admin o técnico registrando por otra persona: se enlaza si el nombre es de UN solo usuario
+      const r = await pool.request().input("Nombre", sql.VarChar, Empleado.trim().toLowerCase())
+        .query("SELECT IdUsuario FROM Usuarios WHERE LOWER(LTRIM(RTRIM(Nombre)) || ' ' || LTRIM(RTRIM(Apellido))) = @Nombre");
+      if (r.recordset.length === 1) idUsuarioReporta = r.recordset[0].IdUsuario;
     }
-    if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado inválido" });
-    if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo inválido" });
+    if (!Empleado || !Empleado.trim() || Empleado.length > 150) return res.status(400).json({ message: "Empleado inválido" });
     if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "Descripción muy corta" });
+    if (!IdArea || Number.isNaN(IdArea)) return res.status(400).json({ message: "Selecciona un área válida." });
+    if (!IdPrioridad || Number.isNaN(IdPrioridad)) return res.status(400).json({ message: "Selecciona una prioridad válida." });
 
-    const pool = await getDb();
+    const existen = await pool.request().input("IdArea", sql.Int, IdArea).input("IdPrioridad", sql.Int, IdPrioridad).query(
+      "SELECT (SELECT COUNT(*)::int FROM Areas WHERE IdArea = @IdArea) AS Areas, (SELECT COUNT(*)::int FROM Prioridades WHERE IdPrioridad = @IdPrioridad) AS Prioridades");
+    if (!existen.recordset[0].areas) return res.status(400).json({ message: "El área no existe." });
+    if (!existen.recordset[0].prioridades) return res.status(400).json({ message: "La prioridad no existe." });
+
+    // Tipo: del catálogo (app nueva). La app anterior manda texto libre: si coincide con
+    // un tipo activo se enlaza; si no, va como "Otro" y el texto se agrega a la descripción.
+    let idTipo = null;
+    if (IdTipoIncidencia) {
+      const t = await pool.request().input("Id", sql.Int, IdTipoIncidencia)
+        .query("SELECT IdTipoIncidencia, Nombre FROM TiposIncidencia WHERE IdTipoIncidencia = @Id AND Activo");
+      if (!t.recordset[0]) return res.status(400).json({ message: "El tipo de incidencia no existe o está desactivado." });
+      idTipo = t.recordset[0].IdTipoIncidencia;
+      TipoIncidencia = t.recordset[0].Nombre;
+    } else {
+      if (!TipoIncidencia || !TipoIncidencia.trim() || TipoIncidencia.length > 100) return res.status(400).json({ message: "Selecciona el tipo de incidencia." });
+      const t = await pool.request().input("Nombre", sql.VarChar, TipoIncidencia.trim())
+        .query("SELECT IdTipoIncidencia, Nombre FROM TiposIncidencia WHERE Nombre = @Nombre::citext AND Activo");
+      if (t.recordset[0]) {
+        idTipo = t.recordset[0].IdTipoIncidencia;
+        TipoIncidencia = t.recordset[0].Nombre;
+      } else {
+        const otro = await pool.request().query("SELECT IdTipoIncidencia, Nombre FROM TiposIncidencia WHERE Nombre = 'Otro'");
+        if (otro.recordset[0]) {
+          Descripcion = `[Tipo indicado: ${TipoIncidencia.trim()}] ${Descripcion}`;
+          idTipo = otro.recordset[0].IdTipoIncidencia;
+          TipoIncidencia = otro.recordset[0].Nombre;
+        }
+      }
+    }
+
     const estados = await pool.request().query("SELECT IdEstado FROM Estados WHERE Nombre = 'Pendiente'");
     const idEstado = estados.recordset[0].IdEstado;
 
@@ -818,10 +1094,12 @@ app.post("/api/incidencias", async (req, res) => {
       .input("IdPrioridad", sql.Int, IdPrioridad)
       .input("IdArea", sql.Int, IdArea)
       .input("IdEstado", sql.Int, idEstado)
-      .input("Empleado", sql.VarChar, Empleado)
+      .input("Empleado", sql.VarChar, Empleado.trim())
       .input("TipoIncidencia", sql.VarChar, TipoIncidencia)
-      .query(`INSERT INTO Incidencias (Descripcion, IdPrioridad, IdArea, IdEstado, Empleado, TipoIncidencia, Fecha, EscaladoSLA)
-              VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, LOCALTIMESTAMP, FALSE)
+      .input("IdTipoIncidencia", sql.Int, idTipo)
+      .input("IdUsuarioReporta", sql.Int, idUsuarioReporta)
+      .query(`INSERT INTO Incidencias (Descripcion, IdPrioridad, IdArea, IdEstado, Empleado, TipoIncidencia, IdTipoIncidencia, IdUsuarioReporta, Fecha, EscaladoSLA)
+              VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, @IdTipoIncidencia, @IdUsuarioReporta, LOCALTIMESTAMP, FALSE)
               RETURNING IdIncidencia`);
               
     const newId = result.recordset[0].IdIncidencia;
@@ -833,43 +1111,84 @@ app.post("/api/incidencias", async (req, res) => {
   } catch (err) { console.error(err); responderError(res, err); }
 });
 
+// Reglas (Etapa 2, iguales a las del escritorio):
+// - Usuario: no edita.
+// - Técnico: solo puede tomar un ticket sin asignar (para sí mismo), solo cambia el estado de
+//   los tickets asignados a él y no puede anular.
+// - Solo se asignan usuarios activos con rol Técnico.
+// - Resuelto/Cerrado requieren técnico. La fecha de solución, de asignación y de primera
+//   respuesta las pone la base de datos (trigger), también al reabrir.
 app.put("/api/incidencias/:id", async (req, res) => {
   if (req.user.Rol === "Usuario") return res.status(403).json({ message: "No puedes editar" });
   try {
-    const { IdEstado, IdTecnicoAsignado, Observaciones } = req.body;
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    const { Observaciones } = req.body;
+    const IdEstado = req.body.IdEstado === undefined ? undefined : aEntero(req.body.IdEstado);
+    const IdTecnicoAsignado = req.body.IdTecnicoAsignado === undefined ? undefined : aEntero(req.body.IdTecnicoAsignado);
+    if (Number.isNaN(IdEstado) || IdEstado === null) return res.status(400).json({ message: "Estado inválido." });
+    if (Number.isNaN(IdTecnicoAsignado)) return res.status(400).json({ message: "Técnico inválido." });
+
     const pool = await getDb();
-    const actualResult = await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
+    const actualResult = await pool.request().input("IdIncidencia", sql.Int, id).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     const actual = actualResult.recordset[0];
     if (!actual) return res.status(404).json({ message: "No encontrada" });
 
-    // Un Técnico solo puede asignarse a sí mismo una incidencia sin técnico (botón "Aceptar"),
-    // no reasignarla ni desasignarla (misma regla que la app de escritorio)
-    if (req.user.Rol === "Técnico" && IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado) {
-      const esAutoAsignacion = IdTecnicoAsignado === req.user.IdUsuario && !actual.IdTecnicoAsignado;
-      if (!esAutoAsignacion) return res.status(403).json({ message: "Solo un administrador puede reasignar incidencias" });
+    const esAdmin = req.user.Rol === "Administrador";
+    const cambiaTecnico = IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado;
+    const cambiaEstado = IdEstado !== undefined && IdEstado !== actual.IdEstado;
+    const tecnicoFinal = cambiaTecnico ? IdTecnicoAsignado : actual.IdTecnicoAsignado;
+    const esAutoAsignacion = cambiaTecnico && IdTecnicoAsignado === req.user.IdUsuario && !actual.IdTecnicoAsignado;
+
+    if (!esAdmin && req.user.Rol !== "Técnico") return res.status(403).json({ message: "Rol no autorizado." });
+
+    // Un Técnico solo puede asignarse a sí mismo una incidencia sin técnico (botón "Aceptar")
+    if (!esAdmin && cambiaTecnico && !esAutoAsignacion) {
+      return res.status(403).json({ message: "Solo un administrador puede asignar o reasignar incidencias" });
+    }
+
+    // Solo técnicos activos
+    if (cambiaTecnico && IdTecnicoAsignado !== null) {
+      const t = await pool.request().input("Id", sql.Int, IdTecnicoAsignado).query("SELECT Rol, Estado FROM Usuarios WHERE IdUsuario = @Id");
+      const tec = t.recordset[0];
+      if (!tec) return res.status(400).json({ message: "El técnico no existe." });
+      if (tec.Rol !== "Técnico") return res.status(400).json({ message: "Solo se pueden asignar usuarios con rol Técnico." });
+      if (!tec.Estado) return res.status(400).json({ message: "El técnico está inactivo." });
+    }
+
+    const { lista: estados, porNombre } = await obtenerEstados(pool);
+    let nombreEstadoNuevo = null;
+    if (cambiaEstado) {
+      const estadoNuevo = estados.find(e => e.IdEstado === IdEstado);
+      if (!estadoNuevo) return res.status(400).json({ message: "El estado no existe." });
+      nombreEstadoNuevo = estadoNuevo.Nombre;
+
+      if (!esAdmin) {
+        if (tecnicoFinal !== req.user.IdUsuario) {
+          return res.status(403).json({ message: "Solo el técnico asignado puede cambiar el estado de esta incidencia." });
+        }
+        if (IdEstado === porNombre("Anulado")) {
+          return res.status(403).json({ message: "Solo un administrador puede anular una incidencia." });
+        }
+      }
+      if ((IdEstado === porNombre("Resuelto") || IdEstado === porNombre("Cerrado")) && !tecnicoFinal) {
+        return res.status(400).json({ message: "Requiere técnico asignado" });
+      }
     }
 
     let setClauses = [];
     const request = pool.request();
     let accionesAuditoria = [];
-    request.input("IdIncidencia", sql.Int, req.params.id);
+    request.input("IdIncidencia", sql.Int, id);
 
-    if (IdEstado !== undefined && IdEstado !== actual.IdEstado) {
+    if (cambiaEstado) {
       setClauses.push("IdEstado = @IdEstado");
       request.input("IdEstado", sql.Int, IdEstado);
-      
-      const estados = await pool.request().query("SELECT IdEstado, Nombre FROM Estados");
-      const idResuelto = estados.recordset.find(e => e.Nombre === "Resuelto")?.IdEstado;
-      const idCerrado = estados.recordset.find(e => e.Nombre === "Cerrado")?.IdEstado;
-      if ((IdEstado === idResuelto || IdEstado === idCerrado)) {
-         const tecFinal = IdTecnicoAsignado !== undefined ? IdTecnicoAsignado : actual.IdTecnicoAsignado;
-         if (!tecFinal) return res.status(400).json({ message: "Requiere técnico asignado" });
-         if (!actual.FechaSolucion) setClauses.push("FechaSolucion = LOCALTIMESTAMP");
-      }
-      accionesAuditoria.push("Cambió estado");
+      const anterior = estados.find(e => e.IdEstado === actual.IdEstado)?.Nombre;
+      accionesAuditoria.push(`Estado: ${anterior} → ${nombreEstadoNuevo}`);
     }
 
-    if (IdTecnicoAsignado !== undefined && IdTecnicoAsignado !== actual.IdTecnicoAsignado) {
+    if (cambiaTecnico) {
       setClauses.push("IdTecnicoAsignado = @IdTecnicoAsignado");
       request.input("IdTecnicoAsignado", sql.Int, IdTecnicoAsignado);
       accionesAuditoria.push(IdTecnicoAsignado ? "Se asignó el ticket" : "Se desasignó");
@@ -882,9 +1201,19 @@ app.put("/api/incidencias/:id", async (req, res) => {
     }
 
     if (setClauses.length > 0) {
-      await request.query(`UPDATE Incidencias SET ${setClauses.join(", ")} WHERE IdIncidencia = @IdIncidencia`);
-      const accion = accionesAuditoria.some(a => a.includes("asign")) ? "Asignar" : "Editar";
-      await registrarAuditoria(pool, req, accion, req.params.id, accionesAuditoria.join(". "));
+      // Al "Aceptar", solo si nadie lo tomó en el mismo instante
+      const condicion = esAutoAsignacion ? " AND IdTecnicoAsignado IS NULL" : "";
+      const upd = await request.query(`UPDATE Incidencias SET ${setClauses.join(", ")} WHERE IdIncidencia = @IdIncidencia${condicion}`);
+      if (upd.rowsAffected[0] === 0) {
+        return res.status(409).json({ message: "Otro técnico tomó este ticket hace un momento." });
+      }
+      const accion = cambiaTecnico ? "Asignar" : "Editar";
+      await registrarAuditoria(pool, req, accion, id, accionesAuditoria.join(". "));
+
+      // Avisos por Telegram (sin esperar, para no demorar la respuesta)
+      // (al "Aceptar" cambian ambos: basta con el aviso de asignación)
+      if (cambiaTecnico && IdTecnicoAsignado) notificarActualizacionIncidencia(pool, id, 'asignar', null, null, req.user.IdUsuario);
+      else if (cambiaEstado) notificarActualizacionIncidencia(pool, id, 'estado', null, null, req.user.IdUsuario);
     }
     
     res.json({ success: true });
@@ -907,9 +1236,7 @@ async function consultarIncidenciasReporte(pool, req) {
   const request = pool.request();
   let query = `SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre || ' ' || t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`;
   if (req.user.Rol === "Usuario") {
-    const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
-    request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
-    query += " WHERE LOWER(LTRIM(RTRIM(i.Empleado))) = @NombreCompleto";
+    query += " WHERE " + await filtroReportante(pool, request, req);
   }
   query += " ORDER BY i.Fecha DESC";
   return request.query(query);

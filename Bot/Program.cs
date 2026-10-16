@@ -307,7 +307,10 @@ namespace Bot
             long chatId = msg.Chat.Id;
             string texto = msg.Text.Trim();
 
-            Log.Information("El chat [{ChatId}] envió el comando/mensaje: {Texto}", chatId, texto);
+            // Nunca registrar el texto completo: /registrar lleva la contraseña del usuario.
+            // Solo se guarda el comando (primera palabra) o la longitud del texto libre.
+            string comandoParaLog = texto.StartsWith("/") ? texto.Split(' ')[0].ToLower() : $"(texto libre, {texto.Length} caracteres)";
+            Log.Information("El chat [{ChatId}] envió: {Comando}", chatId, comandoParaLog);
 
             if (conversaciones.TryGetValue(chatId, out _))
             {
@@ -698,9 +701,23 @@ namespace Bot
         // ==========================================
         static async Task ManejarRegistrar(Message msg, string[] partes)
         {
+            // El mensaje lleva la contraseña en claro: se borra del chat apenas se lee,
+            // tenga o no el formato correcto.
+            if (partes.Length > 1)
+            {
+                try
+                {
+                    await botClient.DeleteMessage(msg.Chat, msg.MessageId);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "No se pudo borrar del chat el mensaje de /registrar.");
+                }
+            }
+
             if (partes.Length != 3)
             {
-                await botClient.SendMessage(msg.Chat, "Uso: /registrar usuario contraseña");
+                await botClient.SendMessage(msg.Chat, "Uso: /registrar usuario contraseña\n(Por seguridad, el mensaje con tu contraseña se borra automáticamente.)");
                 return;
             }
 

@@ -539,7 +539,9 @@ app.get("/api/adopcion", async (req, res) => {
 app.get("/api/usuarios", requireAdmin, async (req, res) => {
   try {
     const pool = await getDb();
-    const result = await pool.request().query("SELECT * FROM Usuarios");
+    // Sin Password (hash) ni FotoPerfil: el listado no los necesita y no deben salir del servidor
+    const result = await pool.request().query(
+      "SELECT IdUsuario, Nombre, Apellido, Correo, Usuario, Rol, Estado, TelegramChatId, IntentosFallidos, BloqueadoHasta FROM Usuarios ORDER BY Apellido, Nombre");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
 });
@@ -647,6 +649,62 @@ app.get("/api/perfil", verifyToken, async (req, res) => {
     } else {
       res.status(404).json({ message: "Usuario no encontrado" });
     }
+  } catch (err) { responderError(res, err); }
+});
+
+// Editar los datos propios (mismas reglas que el perfil del escritorio)
+const REGEX_CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+app.put("/api/perfil", async (req, res) => {
+  try {
+    const Nombre = (req.body.Nombre || "").trim();
+    const Apellido = (req.body.Apellido || "").trim();
+    const Correo = (req.body.Correo || "").trim();
+    if (!Nombre || Nombre.length > 100) return res.status(400).json({ message: "El nombre es obligatorio (máximo 100 caracteres)." });
+    if (!Apellido || Apellido.length > 100) return res.status(400).json({ message: "El apellido es obligatorio (máximo 100 caracteres)." });
+    if (!Correo || Correo.length > 150 || !REGEX_CORREO.test(Correo)) return res.status(400).json({ message: "El correo no tiene un formato válido." });
+
+    const pool = await getDb();
+    try {
+      await pool.request()
+        .input("IdUsuario", sql.Int, req.user.IdUsuario)
+        .input("Nombre", sql.VarChar, Nombre)
+        .input("Apellido", sql.VarChar, Apellido)
+        .input("Correo", sql.VarChar, Correo)
+        .query("UPDATE Usuarios SET Nombre = @Nombre, Apellido = @Apellido, Correo = @Correo WHERE IdUsuario = @IdUsuario");
+    } catch (dbErr) {
+      if (dbErr.code === "23505") return res.status(409).json({ message: "Ya existe un usuario registrado con ese correo." });
+      throw dbErr;
+    }
+    await registrarAuditoria(pool, req, "Modificar", req.user.IdUsuario, "Actualizó sus datos de perfil", "Usuario");
+    res.json({ success: true, Nombre, Apellido, Correo });
+  } catch (err) { responderError(res, err); }
+});
+
+// Cambiar la contraseña propia: exige la actual (igual que el escritorio)
+app.put("/api/perfil/password", async (req, res) => {
+  try {
+    const { PasswordActual, PasswordNueva } = req.body;
+    if (!PasswordActual) return res.status(400).json({ message: "Ingresa tu contraseña actual." });
+    if (!PasswordNueva || PasswordNueva.length < 6) return res.status(400).json({ message: "La nueva contraseña debe tener al menos 6 caracteres." });
+
+    const pool = await getDb();
+    const r = await pool.request()
+      .input("IdUsuario", sql.Int, req.user.IdUsuario)
+      .query("SELECT Password FROM Usuarios WHERE IdUsuario = @IdUsuario AND Estado = TRUE");
+    const usuario = r.recordset[0];
+    if (!usuario) return res.status(404).json({ message: "Usuario no encontrado o inactivo." });
+
+    // 400 y no 401: un 401 cerraría la sesión en la app
+    const coincide = await bcrypt.compare(PasswordActual, usuario.Password);
+    if (!coincide) return res.status(400).json({ message: "La contraseña actual no es correcta." });
+
+    const hash = await bcrypt.hash(PasswordNueva, 10);
+    await pool.request()
+      .input("IdUsuario", sql.Int, req.user.IdUsuario)
+      .input("Hash", sql.VarChar, hash)
+      .query("UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @IdUsuario");
+    await registrarAuditoria(pool, req, "Cambiar contraseña", req.user.IdUsuario, "Cambió su contraseña desde la app móvil", "Usuario");
+    res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
 

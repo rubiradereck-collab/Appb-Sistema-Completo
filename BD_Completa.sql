@@ -512,3 +512,6 @@ $$;
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO appb_app;
 -- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO appb_app;
 -- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO appb_app;
+--
+-- Después ejecuta BD_Seguridad_Roles.sql: crea appb_escritorio (solo funciones)
+-- para la app de escritorio y protege la auditoría. Ver SEGURIDAD_ETAPA1.md.

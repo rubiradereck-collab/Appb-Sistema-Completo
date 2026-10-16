@@ -1,9 +1,7 @@
 ﻿using Datos.Base_de_Datos;
-using System;
+using NpgsqlTypes;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
@@ -11,86 +9,45 @@ namespace Datos.Gestion_de_Datos
     {
         public static List<sp_Guias_ListarResult> ListarGuias()
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT * FROM sp_guias_listar()",
+                dr => new sp_Guias_ListarResult
                 {
-                    return DB.sp_Guias_Listar().ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Listar guías", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+                    IdGuia = Entero(dr, "idguia"),
+                    Titulo = Texto(dr, "titulo"),
+                    Problema = Texto(dr, "problema"),
+                    Solucion = Texto(dr, "solucion")
+                }),
+                "Error al ejecutar el procedimiento Listar guías");
         }
 
         public static void InsertarGuia(Entidades.Gestion_de_Entidades.Guia oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Guias_Insertar(oc.Titulo, oc.Problema, oc.Solucion);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al insertar en la tabla Guias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_guias_insertar(@titulo, @problema, @solucion)",
+                P("titulo", NpgsqlDbType.Varchar, oc.Titulo),
+                P("problema", NpgsqlDbType.Text, oc.Problema),
+                P("solucion", NpgsqlDbType.Text, oc.Solucion)),
+                "Error al insertar en la tabla Guias");
         }
 
         public static void ModificarGuia(Entidades.Gestion_de_Entidades.Guia oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Guias_Modificar(oc.IdGuia, oc.Titulo, oc.Problema, oc.Solucion);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al modificar en la tabla Guias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_guias_modificar(@id, @titulo, @problema, @solucion)",
+                P("id", NpgsqlDbType.Integer, oc.IdGuia),
+                P("titulo", NpgsqlDbType.Varchar, oc.Titulo),
+                P("problema", NpgsqlDbType.Text, oc.Problema),
+                P("solucion", NpgsqlDbType.Text, oc.Solucion)),
+                "Error al modificar en la tabla Guias");
         }
 
         public static void EliminarGuia(Entidades.Gestion_de_Entidades.Guia oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Guias_Eliminar(oc.IdGuia);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al eliminar en la tabla Guias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_guias_eliminar(@id)",
+                P("id", NpgsqlDbType.Integer, oc.IdGuia)),
+                "Error al eliminar en la tabla Guias");
         }
     }
-
 }

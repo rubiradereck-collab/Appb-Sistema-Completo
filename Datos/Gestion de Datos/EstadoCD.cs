@@ -1,10 +1,7 @@
 ﻿using Datos.Base_de_Datos;
-using System;
+using NpgsqlTypes;
 using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
@@ -12,90 +9,39 @@ namespace Datos.Gestion_de_Datos
     {
         public static List<sp_Estados_ListarResult> ListarEstados()
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT * FROM sp_estados_listar()",
+                dr => new sp_Estados_ListarResult
                 {
-                    return DB.sp_Estados_Listar().ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Listar estados", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+                    IdEstado = Entero(dr, "idestado"),
+                    Nombre = Texto(dr, "nombre")
+                }),
+                "Error al ejecutar el procedimiento Listar estados");
         }
 
         public static void InsertarEstado(Entidades.Gestion_de_Entidades.Estado oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Estados_Insertar(oc.Nombre);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al insertar en la tabla Estados", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_estados_insertar(@nombre)",
+                P("nombre", NpgsqlDbType.Varchar, oc.Nombre)),
+                "Error al insertar en la tabla Estados");
         }
 
         public static void ModificarEstado(Entidades.Gestion_de_Entidades.Estado oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Estados_Modificar(oc.IdEstado, oc.Nombre);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al modificar en la tabla Estados", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_estados_modificar(@id, @nombre)",
+                P("id", NpgsqlDbType.Integer, oc.IdEstado),
+                P("nombre", NpgsqlDbType.Varchar, oc.Nombre)),
+                "Error al modificar en la tabla Estados");
         }
 
         public static void EliminarEstado(Entidades.Gestion_de_Entidades.Estado oe)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Estados_Eliminar(oe.IdEstado);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al eliminar en la tabla Estados"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al eliminar en la tabla Estados", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_estados_eliminar(@id)",
+                P("id", NpgsqlDbType.Integer, oe.IdEstado)),
+                "Error al eliminar en la tabla Estados");
         }
-
     }
 }

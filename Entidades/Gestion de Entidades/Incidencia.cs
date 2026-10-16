@@ -30,7 +30,7 @@ namespace Entidades.Gestion_de_Entidades
         private string nombreEstado;
         private string tecnicoAsignado;
 
-        // Control de concurrencia optimista: viene del ROWVERSION de SQL Server.
+        // Control de concurrencia optimista: viene de la columna FilaVersion (contador que un trigger de PostgreSQL incrementa en cada UPDATE).
         // Solo se llena al listar (ShowIncidencia); se usa en Modificar para detectar
         // si otra persona cambió la incidencia mientras la teníamos abierta.
         private byte[] filaVersion;

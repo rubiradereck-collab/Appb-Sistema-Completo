@@ -48,6 +48,9 @@ namespace Logica.Gestion_de_Logica
                     oc.NombrePrioridad = obj.NombrePrioridad;
                     oc.NombreEstado = obj.NombreEstado;
                     oc.TecnicoAsignado = obj.TecnicoAsignado;
+                    // Necesario para el control de concurrencia al modificar (antes no se copiaba
+                    // y la edición siempre se reportaba como conflicto).
+                    oc.FilaVersion = obj.FilaVersion;
 
                     lista.Add(oc);
                 }

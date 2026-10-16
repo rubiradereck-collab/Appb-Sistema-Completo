@@ -4,7 +4,7 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-const { getSqlServerDb, sql } = require("./db_sqlserver");
+const { getDb, sql } = require("./db_postgres");
 
 const axios = require('axios');
 
@@ -24,11 +24,11 @@ const enviarTelegram = async (chatId, text, reply_markup = null) => {
 
 const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil", idTecnicoAsignado = null) => {
   try {
-    let query = "SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = 1 AND TelegramChatId IS NOT NULL";
+    let query = "SELECT TelegramChatId FROM Usuarios WHERE Rol = 'Técnico' AND Estado = TRUE AND TelegramChatId IS NOT NULL";
     const req = pool.request();
     if (idTecnicoAsignado) {
        query += " AND IdUsuario = @IdTecnico";
-       req.input('IdTecnico', require('mssql').Int, idTecnicoAsignado);
+       req.input('IdTecnico', sql.Int, idTecnicoAsignado);
     }
     const tecnicos = await req.query(query);
     const mensaje = `🆕 Nueva Incidencia #${incidencia.IdIncidencia} (${origen})\nEmpleado: ${incidencia.Empleado}\nTipo: ${incidencia.TipoIncidencia}\nDescripción: ${incidencia.Descripcion}`;
@@ -38,9 +38,9 @@ const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil",
       if (messageId && !idTecnicoAsignado) {
          try {
            await pool.request()
-              .input('IdIncidencia', require('mssql').Int, incidencia.IdIncidencia)
-              .input('ChatId', require('mssql').BigInt, t.TelegramChatId)
-              .input('MessageId', require('mssql').Int, messageId)
+              .input('IdIncidencia', sql.Int, incidencia.IdIncidencia)
+              .input('ChatId', sql.BigInt, t.TelegramChatId)
+              .input('MessageId', sql.Int, messageId)
               .query("INSERT INTO TelegramMensajes (IdIncidencia, ChatId, MessageId) VALUES (@IdIncidencia, @ChatId, @MessageId)");
          } catch(dbErr) { console.error("DB Insert error TelegramMensajes", dbErr); }
       }
@@ -53,7 +53,7 @@ const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil",
 const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, tecnicoId, nuevoValor) => {
   try {
     if (!tecnicoId) return;
-    const userRes = await pool.request().input('Id', require('mssql').Int, tecnicoId).query("SELECT TelegramChatId FROM Usuarios WHERE IdUsuario = @Id");
+    const userRes = await pool.request().input('Id', sql.Int, tecnicoId).query("SELECT TelegramChatId FROM Usuarios WHERE IdUsuario = @Id");
     const chatId = userRes.recordset[0]?.TelegramChatId;
     if (!chatId) return;
 
@@ -113,9 +113,9 @@ const getTransporter = () => {
 
 app.get("/api/test-db", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT 1 AS TestStatus");
-    res.json({ success: true, message: "Conexión a SQL Server exitosa", data: result.recordset });
+    res.json({ success: true, message: "Conexión a PostgreSQL exitosa", data: result.recordset });
   } catch (err) {
     console.error("Test DB falló:", err);
     res.status(500).json({ success: false, message: "No se pudo conectar a la base de datos" });
@@ -130,10 +130,10 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
       const transporter = getTransporter();
       if (!transporter) return res.status(503).json({ message: 'Servicio de correo no configurado' });
 
-      const pool = await getSqlServerDb();
+      const pool = await getDb();
       const userRes = await pool.request()
         .input('Correo', sql.VarChar, Correo)
-        .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = 1');
+        .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = TRUE');
   
       if (userRes.recordset.length === 0) {
         return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
@@ -179,7 +179,7 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request()
       .input("Usuario", sql.VarChar, username)
       .query("SELECT * FROM Usuarios WHERE Usuario = @Usuario");
@@ -200,15 +200,12 @@ app.post("/api/auth/login", async (req, res) => {
     const match = await bcrypt.compare(password, user.Password);
     if (!match) {
       const intentos = (user.IntentosFallidos || 0) + 1;
-      let bloqueadoHasta = null;
-      if (intentos >= 3) {
-        bloqueadoHasta = new Date(Date.now() + 15 * 60000);
-      }
+      // 3 intentos fallidos => bloqueo de 15 minutos (la hora la calcula PostgreSQL)
       await pool.request()
         .input("IdUsuario", sql.Int, user.IdUsuario)
         .input("IntentosFallidos", sql.Int, intentos)
-        .input("BloqueadoHasta", sql.DateTime, bloqueadoHasta)
-        .query("UPDATE Usuarios SET IntentosFallidos = @IntentosFallidos, BloqueadoHasta = @BloqueadoHasta WHERE IdUsuario = @IdUsuario");
+        .input("Bloquear", sql.Bit, intentos >= 3)
+        .query("UPDATE Usuarios SET IntentosFallidos = @IntentosFallidos, BloqueadoHasta = CASE WHEN @Bloquear THEN LOCALTIMESTAMP + INTERVAL '15 minutes' ELSE NULL END WHERE IdUsuario = @IdUsuario");
         
       return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
     }
@@ -258,7 +255,7 @@ app.post('/api/interno/notificar', async (req, res) => {
   }
   try {
     const { tipoEvento, idIncidencia, idTecnicoAsignado, nuevoEstado, empleado, tipoIncidencia, descripcion, origen } = req.body;
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
 
     if (tipoEvento === 'nueva') {
       const mockIncidencia = { 
@@ -326,7 +323,7 @@ async function registrarAuditoria(pool, req, accion, idRef, detalles, entidad = 
 
 app.get("/api/areas", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT * FROM Areas");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -334,17 +331,17 @@ app.get("/api/areas", async (req, res) => {
 
 app.post("/api/areas", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request()
       .input("NombreArea", sql.VarChar, req.body.NombreArea)
-      .query("INSERT INTO Areas (NombreArea) OUTPUT INSERTED.IdArea VALUES (@NombreArea)");
+      .query("INSERT INTO Areas (NombreArea) VALUES (@NombreArea) RETURNING IdArea");
     res.status(201).json({ id: result.recordset[0].IdArea });
   } catch (err) { responderError(res, err); }
 });
 
 app.put("/api/areas/:id", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdArea", sql.Int, req.params.id)
       .input("NombreArea", sql.VarChar, req.body.NombreArea)
@@ -355,7 +352,7 @@ app.put("/api/areas/:id", requireAdmin, async (req, res) => {
 
 app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request().input("IdArea", sql.Int, req.params.id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
@@ -363,7 +360,7 @@ app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
 
 app.get("/api/prioridades", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT IdPrioridad, Nombre AS NombrePrioridad FROM Prioridades");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -371,7 +368,7 @@ app.get("/api/prioridades", async (req, res) => {
 
 app.get("/api/estados", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT IdEstado, Nombre AS NombreEstado FROM Estados");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -379,7 +376,7 @@ app.get("/api/estados", async (req, res) => {
 
 app.get("/api/guias", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT * FROM Guias");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -390,7 +387,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
     const { correoDestino } = req.body;
     if (!correoDestino) return res.status(400).json({ error: "correoDestino es requerido" });
     
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request()
       .input("IdGuia", sql.Int, req.params.id)
       .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
@@ -428,7 +425,7 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
 app.post("/api/guias", requireAdmin, async (req, res) => {
   try {
     const { Titulo, Problema, Solucion } = req.body;
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("Titulo", sql.VarChar, Titulo)
       .input("Problema", sql.VarChar, Problema)
@@ -441,7 +438,7 @@ app.post("/api/guias", requireAdmin, async (req, res) => {
 app.put("/api/guias/:id", requireAdmin, async (req, res) => {
   try {
     const { Titulo, Problema, Solucion } = req.body;
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdGuia", sql.Int, req.params.id)
       .input("Titulo", sql.VarChar, Titulo)
@@ -454,7 +451,7 @@ app.put("/api/guias/:id", requireAdmin, async (req, res) => {
 
 app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdGuia", sql.Int, req.params.id)
       .query("DELETE FROM Guias WHERE IdGuia = @IdGuia");
@@ -464,7 +461,7 @@ app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
 
 app.get("/api/auditoria", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT * FROM Auditoria ORDER BY Fecha DESC");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -490,11 +487,11 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
       ? "Adjunto encontrará el catálogo de guías rápidas de solución a problemas frecuentes."
       : "Adjunto encontrará el reporte generado desde el Sistema de Incidencias APPB.");
 
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
 
     if (sendToAll) {
       // Todos los usuarios activos con correo, en copia oculta y por lotes de 50
-      const r = await pool.request().query("SELECT Correo FROM Usuarios WHERE Estado = 1 AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
+      const r = await pool.request().query("SELECT Correo FROM Usuarios WHERE Estado = TRUE AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
       const destinatarios = r.recordset.map(u => u.Correo.trim());
       if (destinatarios.length === 0) return res.status(400).json({ message: "No hay usuarios activos con correo" });
 
@@ -522,15 +519,15 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
 
 app.get("/api/adopcion", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
-    const usr = await pool.request().query("SELECT Nombre, Apellido FROM Usuarios WHERE Rol = 'Usuario' AND Estado = 1");
+    const pool = await getDb();
+    const usr = await pool.request().query("SELECT Nombre, Apellido FROM Usuarios WHERE Rol = 'Usuario' AND Estado = TRUE");
     const nombresValidos = new Set(usr.recordset.map(u => `${(u.Nombre || '').trim()} ${(u.Apellido || '').trim()}`.toLowerCase()));
     const totalUsuariosActivos = nombresValidos.size;
 
     const inc = await pool.request().query("SELECT DISTINCT LOWER(LTRIM(RTRIM(Empleado))) AS Empleado FROM Incidencias WHERE Empleado IS NOT NULL");
     const reportan = inc.recordset.filter(i => nombresValidos.has(i.Empleado)).length;
 
-    const corr = await pool.request().query("SELECT COUNT(*) AS Total FROM Usuarios WHERE Estado = 1 AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
+    const corr = await pool.request().query("SELECT COUNT(*)::int AS Total FROM Usuarios WHERE Estado = TRUE AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
 
     const adopcionPorcentaje = totalUsuariosActivos > 0 ? Math.min(100, (reportan / totalUsuariosActivos) * 100) : 0;
     res.json({ adopcionPorcentaje, totalUsuariosActivos, usuariosQueReportan: reportan, totalDestinatariosCorreo: corr.recordset[0].Total });
@@ -541,7 +538,7 @@ app.get("/api/adopcion", async (req, res) => {
 
 app.get("/api/usuarios", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request().query("SELECT * FROM Usuarios");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
@@ -550,7 +547,7 @@ app.get("/api/usuarios", requireAdmin, async (req, res) => {
 app.post("/api/usuarios", requireAdmin, async (req, res) => {
   try {
     const hash = await bcrypt.hash(req.body.Password, 10);
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request()
       .input("Nombre", sql.VarChar, req.body.Nombre)
       .input("Apellido", sql.VarChar, req.body.Apellido)
@@ -558,16 +555,16 @@ app.post("/api/usuarios", requireAdmin, async (req, res) => {
       .input("Usuario", sql.VarChar, req.body.UsuarioLogin)
       .input("Password", sql.VarChar, hash)
       .input("Rol", sql.VarChar, req.body.Rol)
-      .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) OUTPUT INSERTED.IdUsuario VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, 1, 0)");
+      .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, TRUE, 0) RETURNING IdUsuario");
     res.status(201).json({ id: result.recordset[0].IdUsuario });
   } catch (err) { responderError(res, err); }
 });
 
 app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
     try {
-      const pool = await getSqlServerDb();
+      const pool = await getDb();
       const userRes = await pool.request()
-        .input('Id', require('mssql').Int, req.params.id)
+        .input('Id', sql.Int, req.params.id)
         .query('SELECT Correo FROM Usuarios WHERE IdUsuario = @Id');
       
       const userEmail = userRes.recordset[0]?.Correo;
@@ -594,8 +591,8 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
       }
 
       await pool.request()
-        .input('Id', require('mssql').Int, req.params.id)
-        .input('Hash', require('mssql').VarChar, hash)
+        .input('Id', sql.Int, req.params.id)
+        .input('Hash', sql.VarChar, hash)
         .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
   
       res.json({ success: true, message: "Contraseña actualizada y correo enviado" });
@@ -606,7 +603,7 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
   try {
     const { Nombre, Apellido, Correo, UsuarioLogin, Usuario, Rol, Estado, TelegramChatId } = req.body;
     const usr = Usuario || UsuarioLogin;
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdUsuario", sql.Int, req.params.id)
       .input("Nombre", sql.VarChar, Nombre)
@@ -626,7 +623,7 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
 
 app.delete("/api/usuarios/:id", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdUsuario", sql.Int, req.params.id)
       .query("DELETE FROM Usuarios WHERE IdUsuario = @IdUsuario");
@@ -636,7 +633,7 @@ app.delete("/api/usuarios/:id", requireAdmin, async (req, res) => {
 
 app.get("/api/perfil", verifyToken, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await pool.request()
       .input("IdUsuario", sql.Int, req.user.IdUsuario)
       .query("SELECT * FROM Usuarios WHERE IdUsuario = @IdUsuario");
@@ -655,8 +652,8 @@ app.get("/api/perfil", verifyToken, async (req, res) => {
 
 app.post("/api/perfil/foto", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
-    // Convert data URL to raw bytes for SQL Server
+    const pool = await getDb();
+    // Convert data URL to raw bytes for PostgreSQL (bytea)
     const base64Data = req.body.FotoPerfil.replace(/^data:image\/\w+;base64,/, "");
     const imageBuffer = Buffer.from(base64Data, 'base64');
     
@@ -670,7 +667,7 @@ app.post("/api/perfil/foto", async (req, res) => {
 
 app.delete("/api/perfil/foto", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request()
       .input("IdUsuario", sql.Int, req.user.IdUsuario)
       .query("UPDATE Usuarios SET FotoPerfil = NULL WHERE IdUsuario = @IdUsuario");
@@ -681,10 +678,10 @@ app.delete("/api/perfil/foto", async (req, res) => {
 // INCIDENCIAS
 app.get("/api/incidencias", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     let query = `
       SELECT i.*, 
-             t.Nombre + ' ' + t.Apellido AS NombreTecnicoAsignado,
+             t.Nombre || ' ' || t.Apellido AS NombreTecnicoAsignado,
              e.Nombre AS NombreEstado,
              p.Nombre AS NombrePrioridad,
              a.NombreArea
@@ -711,10 +708,10 @@ app.get("/api/incidencias", async (req, res) => {
 
 app.get("/api/incidencias/:id", async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const query = `
       SELECT i.*, 
-             t.Nombre + ' ' + t.Apellido AS NombreTecnicoAsignado,
+             t.Nombre || ' ' || t.Apellido AS NombreTecnicoAsignado,
              e.Nombre AS NombreEstado,
              p.Nombre AS NombrePrioridad,
              a.NombreArea
@@ -748,13 +745,13 @@ app.post("/api/incidencias", async (req, res) => {
     let { Empleado } = req.body;
     if (req.user.Rol === "Usuario") {
       // Un Usuario solo puede reportar a su propio nombre
-      Empleado = await obtenerNombreCompleto(await getSqlServerDb(), req.user.IdUsuario);
+      Empleado = await obtenerNombreCompleto(await getDb(), req.user.IdUsuario);
     }
     if (!Empleado || Empleado.length > 150) return res.status(400).json({ message: "Empleado inválido" });
     if (!TipoIncidencia || TipoIncidencia.length > 100) return res.status(400).json({ message: "Tipo inválido" });
     if (!Descripcion || Descripcion.trim().length < 10) return res.status(400).json({ message: "Descripción muy corta" });
 
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const estados = await pool.request().query("SELECT IdEstado FROM Estados WHERE Nombre = 'Pendiente'");
     const idEstado = estados.recordset[0].IdEstado;
 
@@ -765,11 +762,9 @@ app.post("/api/incidencias", async (req, res) => {
       .input("IdEstado", sql.Int, idEstado)
       .input("Empleado", sql.VarChar, Empleado)
       .input("TipoIncidencia", sql.VarChar, TipoIncidencia)
-      .input("Fecha", sql.DateTime, new Date())
-      .input("EscaladoSLA", sql.Bit, 0)
       .query(`INSERT INTO Incidencias (Descripcion, IdPrioridad, IdArea, IdEstado, Empleado, TipoIncidencia, Fecha, EscaladoSLA)
-              OUTPUT INSERTED.IdIncidencia 
-              VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, @Fecha, @EscaladoSLA)`);
+              VALUES (@Descripcion, @IdPrioridad, @IdArea, @IdEstado, @Empleado, @TipoIncidencia, LOCALTIMESTAMP, FALSE)
+              RETURNING IdIncidencia`);
               
     const newId = result.recordset[0].IdIncidencia;
     await registrarAuditoria(pool, req, "Crear", newId, "Creó la incidencia");
@@ -784,7 +779,7 @@ app.put("/api/incidencias/:id", async (req, res) => {
   if (req.user.Rol === "Usuario") return res.status(403).json({ message: "No puedes editar" });
   try {
     const { IdEstado, IdTecnicoAsignado, Observaciones } = req.body;
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const actualResult = await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("SELECT * FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     const actual = actualResult.recordset[0];
     if (!actual) return res.status(404).json({ message: "No encontrada" });
@@ -811,7 +806,7 @@ app.put("/api/incidencias/:id", async (req, res) => {
       if ((IdEstado === idResuelto || IdEstado === idCerrado)) {
          const tecFinal = IdTecnicoAsignado !== undefined ? IdTecnicoAsignado : actual.IdTecnicoAsignado;
          if (!tecFinal) return res.status(400).json({ message: "Requiere técnico asignado" });
-         if (!actual.FechaSolucion) setClauses.push("FechaSolucion = GETDATE()");
+         if (!actual.FechaSolucion) setClauses.push("FechaSolucion = LOCALTIMESTAMP");
       }
       accionesAuditoria.push("Cambió estado");
     }
@@ -840,7 +835,7 @@ app.put("/api/incidencias/:id", async (req, res) => {
 
 app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
     await registrarAuditoria(pool, req, "Eliminar", req.params.id, "Eliminó el ticket permanentemente");
     res.json({ success: true });
@@ -852,7 +847,7 @@ const { generarPdfIncidencias, generarExcelIncidencias } = require('./reports');
 // Consulta para los reportes PDF/Excel; el rol Usuario solo recibe sus incidencias
 async function consultarIncidenciasReporte(pool, req) {
   const request = pool.request();
-  let query = `SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre + ' ' + t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`;
+  let query = `SELECT i.*, a.NombreArea, p.Nombre AS NombrePrioridad, e.Nombre AS NombreEstado, t.Nombre || ' ' || t.Apellido AS TecnicoAsignado FROM Incidencias i LEFT JOIN Areas a ON i.IdArea = a.IdArea LEFT JOIN Prioridades p ON i.IdPrioridad = p.IdPrioridad LEFT JOIN Estados e ON i.IdEstado = e.IdEstado LEFT JOIN Usuarios t ON i.IdTecnicoAsignado = t.IdUsuario`;
   if (req.user.Rol === "Usuario") {
     const nombre = await obtenerNombreCompleto(pool, req.user.IdUsuario);
     request.input("NombreCompleto", sql.VarChar, (nombre || "").toLowerCase());
@@ -864,7 +859,7 @@ async function consultarIncidenciasReporte(pool, req) {
 
 app.get('/api/reportes/incidencias/pdf', async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await consultarIncidenciasReporte(pool, req);
     const pdfBuffer = await generarPdfIncidencias(result.recordset);
     res.setHeader('Content-Type', 'application/pdf');
@@ -875,7 +870,7 @@ app.get('/api/reportes/incidencias/pdf', async (req, res) => {
 
 app.get('/api/reportes/incidencias/excel', async (req, res) => {
   try {
-    const pool = await getSqlServerDb();
+    const pool = await getDb();
     const result = await consultarIncidenciasReporte(pool, req);
     const excelBuffer = await generarExcelIncidencias(result.recordset);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -885,7 +880,7 @@ app.get('/api/reportes/incidencias/excel', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`API (SQL Server backend) running on http://localhost:${PORT}`);
+  console.log(`API (PostgreSQL backend) running on http://localhost:${PORT}`);
 });
 
 

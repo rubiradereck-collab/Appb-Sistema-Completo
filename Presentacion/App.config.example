@@ -11,8 +11,8 @@
 	</appSettings>
 	<connectionStrings>
 		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2"
-			connectionString="Data Source=131.150.25.22,1433;Initial Catalog=DBIncidencias;User ID=appb_app;Password=TU_NUEVO_PASSWORD_SQL;Encrypt=True;TrustServerCertificate=True"
-			providerName="System.Data.SqlClient" />
+			connectionString="Host=131.150.25.22;Port=5432;Database=dbincidencias;Username=appb_app;Password=TU_NUEVO_PASSWORD_POSTGRES;SSL Mode=Prefer"
+			providerName="Npgsql" />
 	</connectionStrings>
 	<startup>
 		<supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.7.2" />
@@ -61,6 +61,26 @@
 			</dependentAssembly>
 			<dependentAssembly>
 				<assemblyIdentity name="Microsoft.Extensions.Primitives" publicKeyToken="adb9793829ddae60" culture="neutral" />
+				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.0" />
+			</dependentAssembly>
+			<dependentAssembly>
+				<assemblyIdentity name="Microsoft.Extensions.Logging.Abstractions" publicKeyToken="adb9793829ddae60" culture="neutral" />
+				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.0" />
+			</dependentAssembly>
+			<dependentAssembly>
+				<assemblyIdentity name="System.Collections.Immutable" publicKeyToken="b03f5f7f11d50a3a" culture="neutral" />
+				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.0" />
+			</dependentAssembly>
+			<dependentAssembly>
+				<assemblyIdentity name="System.Diagnostics.DiagnosticSource" publicKeyToken="cc7b13ffcd2ddd51" culture="neutral" />
+				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.1" />
+			</dependentAssembly>
+			<dependentAssembly>
+				<assemblyIdentity name="System.Text.Encodings.Web" publicKeyToken="cc7b13ffcd2ddd51" culture="neutral" />
+				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.0" />
+			</dependentAssembly>
+			<dependentAssembly>
+				<assemblyIdentity name="System.Threading.Channels" publicKeyToken="cc7b13ffcd2ddd51" culture="neutral" />
 				<bindingRedirect oldVersion="0.0.0.0-99.9.9.9" newVersion="8.0.0.0" />
 			</dependentAssembly>
 		</assemblyBinding>

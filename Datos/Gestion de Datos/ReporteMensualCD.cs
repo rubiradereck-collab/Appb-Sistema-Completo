@@ -1,7 +1,7 @@
-﻿using System;
-using System.Data.SqlClient;
-using System.Linq;
-using Datos.Base_de_Datos;
+﻿using Datos.Base_de_Datos;
+using NpgsqlTypes;
+using System.Collections.Generic;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
@@ -9,47 +9,20 @@ namespace Datos.Gestion_de_Datos
     {
         public static bool YaFueEnviado(int anio, int mes)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    int count = DB.ExecuteQuery<int>(
-                        "SELECT COUNT(*) FROM dbo.ReportesMensualesEnviados WHERE Anio = {0} AND Mes = {1}",
-                        anio, mes).First();
-                    return count > 0;
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al verificar el reporte mensual"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al verificar el reporte mensual", ex);
-            }
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT COUNT(*) FROM reportesmensualesenviados WHERE anio = @anio AND mes = @mes",
+                P("anio", NpgsqlDbType.Integer, anio),
+                P("mes", NpgsqlDbType.Integer, mes)) > 0,
+                "Error al verificar el reporte mensual");
         }
 
         public static void RegistrarEnvio(int anio, int mes)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.ExecuteCommand(
-                        "INSERT INTO dbo.ReportesMensualesEnviados (Anio, Mes, FechaEnvio) VALUES ({0}, {1}, GETDATE())",
-                        anio, mes);
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al registrar el reporte mensual"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al registrar el reporte mensual", ex);
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "INSERT INTO reportesmensualesenviados (anio, mes, fechaenvio) VALUES (@anio, @mes, LOCALTIMESTAMP)",
+                P("anio", NpgsqlDbType.Integer, anio),
+                P("mes", NpgsqlDbType.Integer, mes)),
+                "Error al registrar el reporte mensual");
         }
     }
 }

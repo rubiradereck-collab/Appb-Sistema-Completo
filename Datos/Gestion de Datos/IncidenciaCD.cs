@@ -1,10 +1,9 @@
 ﻿using Datos.Base_de_Datos;
+using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
@@ -12,162 +11,107 @@ namespace Datos.Gestion_de_Datos
     {
         public static List<sp_Incidencias_ListarResult> ListarIncidencias()
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT * FROM sp_incidencias_listar()",
+                dr => new sp_Incidencias_ListarResult
                 {
-                    return DB.sp_Incidencias_Listar().ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Listar incidencias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+                    IdIncidencia = Entero(dr, "idincidencia"),
+                    NumeroTicket = Texto(dr, "numeroticket"),
+                    Fecha = Fecha(dr, "fecha"),
+                    Empleado = Texto(dr, "empleado"),
+                    IdArea = Entero(dr, "idarea"),
+                    NombreArea = Texto(dr, "nombrearea"),
+                    TipoIncidencia = Texto(dr, "tipoincidencia"),
+                    Descripcion = Texto(dr, "descripcion"),
+                    IdPrioridad = Entero(dr, "idprioridad"),
+                    NombrePrioridad = Texto(dr, "nombreprioridad"),
+                    IdEstado = Entero(dr, "idestado"),
+                    NombreEstado = Texto(dr, "nombreestado"),
+                    IdTecnicoAsignado = EnteroNulo(dr, "idtecnicoasignado"),
+                    TecnicoAsignado = Texto(dr, "tecnicoasignado"),
+                    FechaSolucion = FechaNula(dr, "fechasolucion"),
+                    Observaciones = Texto(dr, "observaciones"),
+                    FilaVersion = Bytes(dr, "filaversion")
+                }),
+                "Error al ejecutar el procedimiento Listar incidencias");
         }
 
+        /// <summary>Inserta la incidencia y devuelve el Id generado.</summary>
         public static int InsertarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    return DB.sp_Incidencias_Insertar(
-                        oc.Empleado,
-                        oc.IdArea,
-                        oc.TipoIncidencia,
-                        oc.Descripcion,
-                        oc.IdPrioridad,
-                        oc.IdEstado,
-                        oc.IdTecnicoAsignado,
-                        oc.Observaciones
-                    );
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al insertar en la tabla Incidencias"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al insertar en la tabla Incidencias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_insertar(@empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @observaciones)",
+                P("empleado", NpgsqlDbType.Varchar, oc.Empleado),
+                P("idarea", NpgsqlDbType.Integer, oc.IdArea),
+                P("tipo", NpgsqlDbType.Varchar, oc.TipoIncidencia),
+                P("descripcion", NpgsqlDbType.Text, oc.Descripcion),
+                P("idprioridad", NpgsqlDbType.Integer, oc.IdPrioridad),
+                P("idestado", NpgsqlDbType.Integer, oc.IdEstado),
+                P("idtecnico", NpgsqlDbType.Integer, oc.IdTecnicoAsignado),
+                P("observaciones", NpgsqlDbType.Text, oc.Observaciones)),
+                "Error al insertar en la tabla Incidencias");
         }
 
+        /// <summary>
+        /// Devuelve false si nadie fue actualizado porque otra persona modificó la
+        /// incidencia después de que se listó (FilaVersion distinta).
+        /// </summary>
         public static bool ModificarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    int filasAfectadas = 
-                        DB.sp_Incidencias_Modificar(
-                        oc.IdIncidencia,
-                        oc.Empleado,
-                        oc.IdArea,
-                        oc.TipoIncidencia,
-                        oc.Descripcion,
-                        oc.IdPrioridad,
-                        oc.IdEstado,
-                        oc.IdTecnicoAsignado,
-                        oc.FechaSolucion,
-                        oc.Observaciones,
-                        oc.FilaVersion
-                    );
-                    return filasAfectadas > 0;
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al modificar en la tabla Incidencias"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al modificar en la tabla Incidencias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_modificar(@id, @empleado, @idarea, @tipo, @descripcion, @idprioridad, @idestado, @idtecnico, @fechasolucion, @observaciones, @filaversion)",
+                P("id", NpgsqlDbType.Integer, oc.IdIncidencia),
+                P("empleado", NpgsqlDbType.Varchar, oc.Empleado),
+                P("idarea", NpgsqlDbType.Integer, oc.IdArea),
+                P("tipo", NpgsqlDbType.Varchar, oc.TipoIncidencia),
+                P("descripcion", NpgsqlDbType.Text, oc.Descripcion),
+                P("idprioridad", NpgsqlDbType.Integer, oc.IdPrioridad),
+                P("idestado", NpgsqlDbType.Integer, oc.IdEstado),
+                P("idtecnico", NpgsqlDbType.Integer, oc.IdTecnicoAsignado),
+                P("fechasolucion", NpgsqlDbType.Timestamp, oc.FechaSolucion),
+                P("observaciones", NpgsqlDbType.Text, oc.Observaciones),
+                P("filaversion", NpgsqlDbType.Bytea, oc.FilaVersion)) > 0,
+                "Error al modificar en la tabla Incidencias");
         }
 
         public static void EliminarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oe)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Incidencias_Eliminar(oe.IdIncidencia);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al eliminar en la tabla Incidencias", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_incidencias_eliminar(@id)",
+                P("id", NpgsqlDbType.Integer, oe.IdIncidencia)),
+                "Error al eliminar en la tabla Incidencias");
         }
 
         public static bool AsignarTecnicoTelegram(int idIncidencia, int idTecnico, int idEstadoEnProceso)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    int? resultado = 0;
-                    // Llamada directa al procedimiento generado por LINQ to SQL
-                    DB.sp_Incidencias_AsignarTecnicoTelegram(idIncidencia, idTecnico, idEstadoEnProceso, ref resultado);
-                    return resultado.HasValue && resultado.Value == 1;
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar procedimiento de asignación por Telegram", ex);
-            }
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_asignartecnicotelegram(@id, @idtecnico, @idestado)",
+                P("id", NpgsqlDbType.Integer, idIncidencia),
+                P("idtecnico", NpgsqlDbType.Integer, idTecnico),
+                P("idestado", NpgsqlDbType.Integer, idEstadoEnProceso)) == 1,
+                "Error al ejecutar procedimiento de asignación por Telegram");
         }
 
         public static bool ActualizarEstadoTelegram(int idIncidencia, int idTecnico, int idNuevoEstado, string observacion)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    int? resultado = 0;
-                    DB.sp_Incidencias_ActualizarEstadoTelegram(idIncidencia, idTecnico, idNuevoEstado, observacion, ref resultado);
-                    return resultado.HasValue && resultado.Value == 1;
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar procedimiento de actualización de estado por Telegram", ex);
-            }
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_actualizarestadotelegram(@id, @idtecnico, @idestado, @observaciones)",
+                P("id", NpgsqlDbType.Integer, idIncidencia),
+                P("idtecnico", NpgsqlDbType.Integer, idTecnico),
+                P("idestado", NpgsqlDbType.Integer, idNuevoEstado),
+                P("observaciones", NpgsqlDbType.Text, observacion)) == 1,
+                "Error al ejecutar procedimiento de actualización de estado por Telegram");
         }
 
         public static void RegistrarMensajeTelegram(int idIncidencia, long chatId, int messageId)
         {
-            BDIncidenciasDataContext DB = null;
             try
             {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.ExecuteCommand("INSERT INTO TelegramMensajes (IdIncidencia, ChatId, MessageId) VALUES ({0}, {1}, {2})", idIncidencia, chatId, messageId);
-                }
+                Ejecutar(
+                    "INSERT INTO telegrammensajes (idincidencia, chatid, messageid) VALUES (@id, @chatid, @messageid)",
+                    P("id", NpgsqlDbType.Integer, idIncidencia),
+                    P("chatid", NpgsqlDbType.Bigint, chatId),
+                    P("messageid", NpgsqlDbType.Integer, messageId));
             }
             catch { /* Ignorar errores de bitácora */ }
         }
@@ -176,13 +120,16 @@ namespace Datos.Gestion_de_Datos
 
         public static List<MensajeTelegramDTO> ObtenerMensajesTelegram(int idIncidencia)
         {
-            BDIncidenciasDataContext DB = null;
             try
             {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    return DB.ExecuteQuery<MensajeTelegramDTO>("SELECT ChatId, MessageId FROM TelegramMensajes WHERE IdIncidencia = {0}", idIncidencia).ToList();
-                }
+                return Listar(
+                    "SELECT chatid, messageid FROM telegrammensajes WHERE idincidencia = @id",
+                    dr => new MensajeTelegramDTO
+                    {
+                        ChatId = LargoNulo(dr, "chatid") ?? 0,
+                        MessageId = Entero(dr, "messageid")
+                    },
+                    P("id", NpgsqlDbType.Integer, idIncidencia));
             }
             catch { return new List<MensajeTelegramDTO>(); }
         }

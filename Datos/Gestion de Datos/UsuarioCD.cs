@@ -1,172 +1,109 @@
 ﻿using Datos.Base_de_Datos;
+using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
     public class UsuarioCD
     {
+        private const string ColumnasUsuario =
+            "idusuario, nombre, apellido, correo, usuario, password, rol, estado, " +
+            "telegramchatid, intentosfallidos, bloqueadohasta, fotoperfil";
+
+        private static T LeerUsuario<T>(Npgsql.NpgsqlDataReader dr) where T : sp_Usuarios_ListarResult, new()
+        {
+            return new T
+            {
+                IdUsuario = Entero(dr, "idusuario"),
+                Nombre = Texto(dr, "nombre"),
+                Apellido = Texto(dr, "apellido"),
+                Correo = Texto(dr, "correo"),
+                Usuario = Texto(dr, "usuario"),
+                Password = Texto(dr, "password"),
+                Rol = Texto(dr, "rol"),
+                Estado = Logico(dr, "estado"),
+                TelegramChatId = LargoNulo(dr, "telegramchatid"),
+                IntentosFallidos = Entero(dr, "intentosfallidos"),
+                BloqueadoHasta = FechaNula(dr, "bloqueadohasta"),
+                FotoPerfil = Bytes(dr, "fotoperfil")
+            };
+        }
+
         public static List<sp_Usuarios_ListarResult> ListarUsuarios()
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    return DB.sp_Usuarios_Listar().ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Listar usuarios", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            return ManejoErrores.Intentar(() => Listar<sp_Usuarios_ListarResult>(
+                "SELECT " + ColumnasUsuario + " FROM sp_usuarios_listar()",
+                LeerUsuario<sp_Usuarios_ListarResult>),
+                "Error al ejecutar el procedimiento Listar usuarios");
         }
 
         public static sp_Usuarios_LoginResult BuscarPorUsuario(string usuario)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    // sp_Usuarios_Login filtra por Usuario + Estado activo en el servidor.
-                    // No compara Password aquí: eso lo hace UsuarioLN con BCrypt.
-                    return DB.sp_Usuarios_Login(usuario).FirstOrDefault();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Login de usuario", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            // sp_usuarios_login filtra por Usuario + Estado activo en el servidor.
+            // No compara Password aquí: eso lo hace UsuarioLN con BCrypt.
+            return ManejoErrores.Intentar(() => Listar<sp_Usuarios_LoginResult>(
+                "SELECT " + ColumnasUsuario + " FROM sp_usuarios_login(@usuario::citext)",
+                LeerUsuario<sp_Usuarios_LoginResult>,
+                P("usuario", NpgsqlDbType.Text, usuario)).FirstOrDefault(),
+                "Error al ejecutar el procedimiento Login de usuario");
         }
 
         public static void InsertarUsuario(Entidades.Gestion_de_Entidades.Usuario oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Usuarios_Insertar(oc.Nombre, oc.Apellido, oc.Correo, oc.UsuarioLogin, oc.Password, oc.Rol, oc.Estado);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al insertar en la tabla Usuarios"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al insertar en la tabla Usuarios", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_insertar(@nombre, @apellido, @correo, @usuario, @password, @rol, @estado)",
+                P("nombre", NpgsqlDbType.Varchar, oc.Nombre),
+                P("apellido", NpgsqlDbType.Varchar, oc.Apellido),
+                P("correo", NpgsqlDbType.Varchar, oc.Correo),
+                P("usuario", NpgsqlDbType.Varchar, oc.UsuarioLogin),
+                P("password", NpgsqlDbType.Varchar, oc.Password),
+                P("rol", NpgsqlDbType.Varchar, oc.Rol),
+                P("estado", NpgsqlDbType.Boolean, oc.Estado)),
+                "Error al insertar en la tabla Usuarios");
         }
 
         public static void ModificarUsuario(Entidades.Gestion_de_Entidades.Usuario oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    System.Data.Linq.Binary fotoBinary = oc.FotoPerfil != null
-                        ? new System.Data.Linq.Binary(oc.FotoPerfil)
-                        : null;
-
-                    DB.sp_Usuarios_Modificar(oc.IdUsuario, oc.Nombre, oc.Apellido, oc.Correo, oc.UsuarioLogin, oc.Password, oc.Rol, oc.Estado, oc.TelegramChatId, fotoBinary);
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al modificar en la tabla Usuarios"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al modificar en la tabla Usuarios", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_modificar(@id, @nombre, @apellido, @correo, @usuario, @password, @rol, @estado, @telegramchatid, @fotoperfil)",
+                P("id", NpgsqlDbType.Integer, oc.IdUsuario),
+                P("nombre", NpgsqlDbType.Varchar, oc.Nombre),
+                P("apellido", NpgsqlDbType.Varchar, oc.Apellido),
+                P("correo", NpgsqlDbType.Varchar, oc.Correo),
+                P("usuario", NpgsqlDbType.Varchar, oc.UsuarioLogin),
+                P("password", NpgsqlDbType.Varchar, oc.Password),
+                P("rol", NpgsqlDbType.Varchar, oc.Rol),
+                P("estado", NpgsqlDbType.Boolean, oc.Estado),
+                P("telegramchatid", NpgsqlDbType.Bigint, oc.TelegramChatId),
+                P("fotoperfil", NpgsqlDbType.Bytea, oc.FotoPerfil)),
+                "Error al modificar en la tabla Usuarios");
         }
 
         public static void EliminarUsuario(Entidades.Gestion_de_Entidades.Usuario oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Usuarios_Eliminar(oc.IdUsuario);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al eliminar en la tabla Usuarios"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al eliminar en la tabla Usuarios", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_eliminar(@id)",
+                P("id", NpgsqlDbType.Integer, oc.IdUsuario)),
+                "Error al eliminar en la tabla Usuarios");
         }
+
         public static void RegistrarIntentoFallido(int idUsuario)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Usuarios_RegistrarIntentoFallido(idUsuario);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al registrar intento fallido", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_registrarintentofallido(@id)",
+                P("id", NpgsqlDbType.Integer, idUsuario)),
+                "Error al registrar intento fallido");
         }
 
         public static void ResetearIntentos(int idUsuario)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Usuarios_ResetearIntentos(idUsuario);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al resetear intentos de login", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_resetearintentos(@id)",
+                P("id", NpgsqlDbType.Integer, idUsuario)),
+                "Error al resetear intentos de login");
         }
     }
 }

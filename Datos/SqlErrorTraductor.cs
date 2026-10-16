@@ -1,30 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Npgsql;
+using System;
 
 namespace Datos
 {
     /// <summary>
-    /// Traduce SqlException (violaciones de UNIQUE, FOREIGN KEY, etc.) a mensajes
-    /// entendibles para el usuario final, en vez de mostrar el texto crudo de SQL Server.
+    /// Traduce PostgresException (violaciones de UNIQUE, FOREIGN KEY, etc.) a mensajes
+    /// entendibles para el usuario final, en vez de mostrar el texto crudo de PostgreSQL.
     /// Se usa desde las clases ...CD antes de envolver el error en DatosExcepciones.
     /// </summary>
     public static class SqlErrorTraductor
     {
-        // Números de error de SQL Server que nos interesa traducir.
-        private const int ERROR_UNIQUE_VIOLATION_1 = 2627; // PRIMARY KEY o UNIQUE con nombre
-        private const int ERROR_UNIQUE_VIOLATION_2 = 2601; // Índice UNIQUE sin restricción con nombre
-        private const int ERROR_FOREIGN_KEY_VIOLATION = 547;
+        // Códigos SQLSTATE de PostgreSQL que nos interesa traducir.
+        private const string ERROR_UNIQUE_VIOLATION = "23505";
+        private const string ERROR_FOREIGN_KEY_VIOLATION = "23503";
 
-        public static string Traducir(SqlException ex, string mensajePorDefecto)
+        public static string Traducir(PostgresException ex, string mensajePorDefecto)
         {
-            switch (ex.Number)
+            switch (ex.SqlState)
             {
-                case ERROR_UNIQUE_VIOLATION_1:
-                case ERROR_UNIQUE_VIOLATION_2:
+                case ERROR_UNIQUE_VIOLATION:
                     return TraducirUnique(ex);
 
                 case ERROR_FOREIGN_KEY_VIOLATION:
@@ -35,37 +29,41 @@ namespace Datos
             }
         }
 
-        private static string TraducirUnique(SqlException ex)
+        private static string TraducirUnique(PostgresException ex)
         {
-            if (Contiene(ex.Message, "UQ_Usuarios_Correo"))
+            string restriccion = ex.ConstraintName ?? ex.MessageText;
+
+            if (Contiene(restriccion, "uq_usuarios_correo"))
                 return "Ya existe un usuario registrado con ese correo.";
 
-            if (Contiene(ex.Message, "UQ_Usuarios_Usuario"))
+            if (Contiene(restriccion, "uq_usuarios_usuario"))
                 return "Ya existe un usuario registrado con ese nombre de usuario.";
 
             return "Ya existe un registro con esos datos (violación de restricción única).";
         }
 
-        private static string TraducirForeignKey(SqlException ex)
+        private static string TraducirForeignKey(PostgresException ex)
         {
-            bool esEliminacion = Contiene(ex.Message, "DELETE statement");
+            // PostgreSQL: "update or delete on table ... violates foreign key constraint ..."
+            bool esEliminacion = Contiene(ex.MessageText, "update or delete on table");
+            string restriccion = ex.ConstraintName ?? ex.MessageText;
 
-            if (Contiene(ex.Message, "FK_Incidencias_Areas"))
+            if (Contiene(restriccion, "fk_incidencias_areas"))
                 return esEliminacion
                     ? "No se puede eliminar esta área porque tiene incidencias asociadas."
                     : "El área seleccionada no es válida.";
 
-            if (Contiene(ex.Message, "FK_Incidencias_Prioridades"))
+            if (Contiene(restriccion, "fk_incidencias_prioridades"))
                 return esEliminacion
                     ? "No se puede eliminar esta prioridad porque tiene incidencias asociadas."
                     : "La prioridad seleccionada no es válida.";
 
-            if (Contiene(ex.Message, "FK_Incidencias_Estados"))
+            if (Contiene(restriccion, "fk_incidencias_estados"))
                 return esEliminacion
                     ? "No se puede eliminar este estado porque tiene incidencias asociadas."
                     : "El estado seleccionado no es válido.";
 
-            if (Contiene(ex.Message, "FK_Incidencias_Tecnico"))
+            if (Contiene(restriccion, "fk_incidencias_tecnico"))
                 return esEliminacion
                     ? "No se puede eliminar este usuario porque tiene incidencias asignadas como técnico."
                     : "El técnico seleccionado no es válido.";
@@ -77,7 +75,7 @@ namespace Datos
 
         private static bool Contiene(string mensaje, string texto)
         {
-            return mensaje.IndexOf(texto, StringComparison.OrdinalIgnoreCase) >= 0;
+            return mensaje != null && mensaje.IndexOf(texto, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

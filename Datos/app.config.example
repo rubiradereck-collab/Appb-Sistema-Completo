@@ -4,7 +4,7 @@
 	</configSections>
 	<connectionStrings>
 		<add name="Datos.Properties.Settings.DBIncidenciasConnectionString2"
-			connectionString="Data Source=131.150.25.22,1433;Initial Catalog=DBIncidencias;User ID=appb_app;Password=TU_NUEVO_PASSWORD_SQL;Encrypt=True;TrustServerCertificate=True"
-			providerName="System.Data.SqlClient" />
+			connectionString="Host=131.150.25.22;Port=5432;Database=dbincidencias;Username=appb_app;Password=TU_NUEVO_PASSWORD_POSTGRES;SSL Mode=Prefer"
+			providerName="Npgsql" />
 	</connectionStrings>
 </configuration>

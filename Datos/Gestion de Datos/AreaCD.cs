@@ -1,10 +1,7 @@
 ﻿using Datos.Base_de_Datos;
-using System;
+using NpgsqlTypes;
 using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Datos.Base_de_Datos.Conexion;
 
 namespace Datos.Gestion_de_Datos
 {
@@ -12,90 +9,39 @@ namespace Datos.Gestion_de_Datos
     {
         public static List<sp_Areas_ListarResult> ListarAreas()
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT * FROM sp_areas_listar()",
+                dr => new sp_Areas_ListarResult
                 {
-                    return DB.sp_Areas_Listar().ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al ejecutar el procedimiento Listar áreas", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+                    IdArea = Entero(dr, "idarea"),
+                    NombreArea = Texto(dr, "nombrearea")
+                }),
+                "Error al ejecutar el procedimiento Listar áreas");
         }
 
         public static void InsertarArea(Entidades.Gestion_de_Entidades.Area oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Areas_Insertar(oc.NombreArea);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al insertar en la tabla Areas", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_areas_insertar(@nombre)",
+                P("nombre", NpgsqlDbType.Varchar, oc.NombreArea)),
+                "Error al insertar en la tabla Areas");
         }
 
         public static void ModificarArea(Entidades.Gestion_de_Entidades.Area oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Areas_Modificar(oc.IdArea, oc.NombreArea);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al modificar en la tabla Areas", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_areas_modificar(@id, @nombre)",
+                P("id", NpgsqlDbType.Integer, oc.IdArea),
+                P("nombre", NpgsqlDbType.Varchar, oc.NombreArea)),
+                "Error al modificar en la tabla Areas");
         }
 
         public static void EliminarArea(Entidades.Gestion_de_Entidades.Area oc)
         {
-            BDIncidenciasDataContext DB = null;
-            try
-            {
-                using (DB = new BDIncidenciasDataContext())
-                {
-                    DB.sp_Areas_Eliminar(oc.IdArea);
-                    DB.SubmitChanges();
-                }
-            }
-            catch (SqlException sqlEx)
-            {
-                throw new DatosExcepciones(SqlErrorTraductor.Traducir(sqlEx, "Error al eliminar en la tabla Areas"), sqlEx);
-            }
-            catch (Exception ex)
-            {
-                throw new DatosExcepciones("Error al eliminar en la tabla Areas", ex);
-            }
-            finally
-            {
-                DB = null;
-            }
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_areas_eliminar(@id)",
+                P("id", NpgsqlDbType.Integer, oc.IdArea)),
+                "Error al eliminar en la tabla Areas");
         }
     }
-
 }

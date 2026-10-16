@@ -159,7 +159,7 @@ const NewIncident = () => {
 
             {/* [FUNCIONALIDAD FUTURA] 
                 La BD original de WinForms no cuenta con una columna en la tabla Incidencias para guardar fotos.
-                Descomentar esto cuando se añada la columna FotoEvidencia VARBINARY(MAX) al SQL Server.
+                Descomentar esto cuando se añada la columna FotoEvidencia BYTEA a PostgreSQL.
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Adjuntar Foto del Error</label>
               <input 

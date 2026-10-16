@@ -89,9 +89,56 @@ const Profile = () => {
     });
   };
 
-  const handleSave = (e) => {
+  const [guardando, setGuardando] = useState(false);
+
+  const avisarError = (mensaje) =>
+    window.dispatchEvent(new CustomEvent('app-error', { detail: mensaje }));
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('app-success', {detail: 'Perfil guardado exitosamente'}));
+    if (guardando) return;
+
+    const { Nombre, Apellido, Correo, PasswordActual, PasswordNueva, PasswordConfirma } = formData;
+    const cambiaPassword = PasswordActual || PasswordNueva || PasswordConfirma;
+
+    if (!Nombre.trim() || !Apellido.trim() || !Correo.trim()) {
+      avisarError('Nombre, apellido y correo son obligatorios.');
+      return;
+    }
+    if (cambiaPassword) {
+      if (!PasswordActual || !PasswordNueva || !PasswordConfirma) {
+        avisarError('Para cambiar la contraseña completa los tres campos.');
+        return;
+      }
+      if (PasswordNueva.length < 6) {
+        avisarError('La nueva contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+      if (PasswordNueva !== PasswordConfirma) {
+        avisarError('La nueva contraseña y su confirmación no coinciden.');
+        return;
+      }
+    }
+
+    setGuardando(true);
+    try {
+      // Los errores 400/409 de la API ya se muestran como aviso desde api.js
+      const res = await api.put('/perfil', { Nombre, Apellido, Correo });
+      updateUser({ Nombre: res.data.Nombre, Apellido: res.data.Apellido, Correo: res.data.Correo });
+
+      if (cambiaPassword) {
+        await api.put('/perfil/password', { PasswordActual, PasswordNueva });
+        setFormData((prev) => ({ ...prev, PasswordActual: '', PasswordNueva: '', PasswordConfirma: '' }));
+      }
+
+      window.dispatchEvent(new CustomEvent('app-success', {
+        detail: cambiaPassword ? 'Perfil y contraseña actualizados' : 'Perfil guardado exitosamente'
+      }));
+    } catch (err) {
+      console.error('Error al guardar el perfil', err);
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const handleTelegram = () => {
@@ -220,9 +267,9 @@ const Profile = () => {
           </div>
 
           {/* Botones de acción */}
-          <button type="submit" className="w-full bg-[#2988c9] hover:bg-[#3498DB] text-white font-bold py-4 rounded-sm flex items-center justify-center space-x-2 shadow-lg transition-colors">
+          <button type="submit" disabled={guardando} className="w-full bg-[#2988c9] hover:bg-[#3498DB] disabled:opacity-60 text-white font-bold py-4 rounded-sm flex items-center justify-center space-x-2 shadow-lg transition-colors">
             <FiSave className="text-xl" />
-            <span>Guardar Cambios</span>
+            <span>{guardando ? 'Guardando…' : 'Guardar Cambios'}</span>
           </button>
 
         </form>

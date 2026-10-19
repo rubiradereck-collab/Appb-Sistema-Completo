@@ -242,21 +242,55 @@ namespace Presentacion
 
         private void AplicarFormatoColumnas()
         {
-            foreach (string columna in new[] { "IdIncidencia", "IdArea", "IdPrioridad", "IdEstado", "IdTecnicoAsignado", "Descripcion", "Observaciones", "FilaVersion", "IdTipoIncidencia", "IdUsuarioReporta" })
+            foreach (string columna in new[] { "IdIncidencia", "IdArea", "IdPrioridad", "IdEstado", "IdTecnicoAsignado", "Descripcion", "Observaciones", "FilaVersion", "IdTipoIncidencia", "IdUsuarioReporta", "FechaCalificacion" })
             {
                 if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
             }
 
-            if (grid.Columns["NumeroTicket"] != null) grid.Columns["NumeroTicket"].HeaderText = "Ticket";
-            if (grid.Columns["NombreArea"] != null) grid.Columns["NombreArea"].HeaderText = "Área";
-            if (grid.Columns["TipoIncidencia"] != null) grid.Columns["TipoIncidencia"].HeaderText = "Tipo";
-            if (grid.Columns["NombrePrioridad"] != null) grid.Columns["NombrePrioridad"].HeaderText = "Prioridad";
-            if (grid.Columns["NombreEstado"] != null) grid.Columns["NombreEstado"].HeaderText = "Estado";
-            if (grid.Columns["TecnicoAsignado"] != null) grid.Columns["TecnicoAsignado"].HeaderText = "Técnico";
-            if (grid.Columns["FechaSolucion"] != null) grid.Columns["FechaSolucion"].HeaderText = "Fecha Solución";
-            if (grid.Columns["FechaAsignacion"] != null) grid.Columns["FechaAsignacion"].HeaderText = "Asignada";
-            if (grid.Columns["FechaPrimeraRespuesta"] != null) grid.Columns["FechaPrimeraRespuesta"].HeaderText = "1.ª Respuesta";
+            // Orden, título y ancho relativo de cada columna visible
+            var columnas = new[]
+            {
+                new { Nombre = "NumeroTicket",          Titulo = "Ticket",        Peso = 120f },
+                new { Nombre = "Fecha",                 Titulo = "Fecha",         Peso = 105f },
+                new { Nombre = "Empleado",              Titulo = "Empleado",      Peso = 130f },
+                new { Nombre = "NombreArea",            Titulo = "Área",          Peso = 110f },
+                new { Nombre = "TipoIncidencia",        Titulo = "Tipo",          Peso = 90f },
+                new { Nombre = "NombrePrioridad",       Titulo = "Prioridad",     Peso = 85f },
+                new { Nombre = "NombreEstado",          Titulo = "Estado",        Peso = 90f },
+                new { Nombre = "TecnicoAsignado",       Titulo = "Técnico",       Peso = 115f },
+                new { Nombre = "FechaAsignacion",       Titulo = "Asignada",      Peso = 105f },
+                new { Nombre = "FechaPrimeraRespuesta", Titulo = "1.ª respuesta", Peso = 105f },
+                new { Nombre = "FechaSolucion",         Titulo = "Solución",      Peso = 105f },
+                new { Nombre = "Calificacion",          Titulo = "Calif.",        Peso = 60f },
+            };
 
+            Font fuenteTitulo = grid.ColumnHeadersDefaultCellStyle.Font ?? grid.Font;
+            int orden = 0;
+            foreach (var c in columnas)
+            {
+                DataGridViewColumn col = grid.Columns[c.Nombre];
+                if (col == null) continue;
+
+                col.HeaderText = c.Titulo;
+                col.FillWeight = c.Peso;
+                col.DisplayIndex = orden++;
+
+                // Que el título nunca se corte: ancho mínimo = la palabra más larga del título
+                int anchoTitulo = 0;
+                foreach (string palabra in c.Titulo.Split(' '))
+                    anchoTitulo = Math.Max(anchoTitulo, TextRenderer.MeasureText(palabra, fuenteTitulo).Width);
+                col.MinimumWidth = anchoTitulo + 24;
+
+                if (col.ValueType == typeof(DateTime) || col.ValueType == typeof(DateTime?))
+                    col.DefaultCellStyle.Format = "dd/MM/yy HH:mm";
+            }
+
+            if (grid.Columns["Calificacion"] != null)
+                grid.Columns["Calificacion"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            // Títulos de dos palabras ("1.ª respuesta") pasan a dos líneas en vez de cortarse
+            grid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
 

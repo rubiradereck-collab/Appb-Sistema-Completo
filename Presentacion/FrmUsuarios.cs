@@ -51,17 +51,29 @@ namespace Presentacion
 
         private void CrearComboArea()
         {
+            // La fila "Área" ocupa el lugar de "Usuario Activo", con la misma etiqueta y el mismo
+            // ancho que los demás campos. "Usuario Activo" pasa a la derecha del combo de Rol.
+            int filaArea = chkEstado.Top;
+            int anchoCampo = cboRol.Width;
+
             var lblArea = new Label
             {
-                Text = "Área",
+                Text = "🏢 Área",
                 AutoSize = true,
-                Font = chkEstado.Font,
-                Location = new Point(chkEstado.Right + 6, chkEstado.Top + 2)
+                Font = label6.Font,
+                ForeColor = label6.ForeColor,
+                BackColor = Color.Transparent,
+                Location = new Point(label6.Left, filaArea)
             };
             cboArea.DropDownStyle = ComboBoxStyle.DropDownList;
             cboArea.Font = cboRol.Font;
-            cboArea.Location = new Point(lblArea.Left + 60, chkEstado.Top - 2);
-            cboArea.Width = Math.Max(140, cboRol.Right - cboArea.Left);
+            cboArea.Location = new Point(cboRol.Left, filaArea);
+            cboArea.Width = anchoCampo;
+
+            cboRol.Width = anchoCampo * 64 / 100;
+            chkEstado.Location = new Point(
+                cboRol.Right + cboRol.Height / 2,
+                cboRol.Top + (cboRol.Height - chkEstado.Height) / 2);
 
             try
             {
@@ -126,7 +138,7 @@ namespace Presentacion
 
         private void FormatearColumnas()
         {
-            foreach (string columna in new[] { "IdUsuario", "Password", "TelegramChatId", "IdArea" })
+            foreach (string columna in new[] { "IdUsuario", "Password", "TelegramChatId", "IdArea", "FotoPerfil" })
             {
                 if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
             }

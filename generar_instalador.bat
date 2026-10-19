@@ -1,6 +1,6 @@
 @echo off
 echo ===========================================
-echo Generando Instalador APPB (Release 1.1.0)
+echo Generando Instalador APPB (Release 1.2.0)
 echo ===========================================
 
 REM Buscar MSBuild

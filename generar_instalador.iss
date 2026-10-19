@@ -1,5 +1,5 @@
-﻿#define MyAppName "APPB Incidencias"
-#define MyAppVersion "1.1.0"
+#define MyAppName "APPB Incidencias"
+#define MyAppVersion "1.2.0"
 #define MyAppPublisher "APPB"
 #define MyAppExeName "Presentacion.exe"
 

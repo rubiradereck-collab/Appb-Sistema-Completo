@@ -840,12 +840,22 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
 app.get("/api/adopcion", async (req, res) => {
   try {
     const pool = await getDb();
-    const usr = await pool.request().query("SELECT Nombre, Apellido FROM Usuarios WHERE Rol = 'Usuario' AND Estado = TRUE");
-    const nombresValidos = new Set(usr.recordset.map(u => `${(u.Nombre || '').trim()} ${(u.Apellido || '').trim()}`.toLowerCase()));
-    const totalUsuariosActivos = nombresValidos.size;
-
-    const inc = await pool.request().query("SELECT DISTINCT LOWER(LTRIM(RTRIM(Empleado))) AS Empleado FROM Incidencias WHERE Empleado IS NOT NULL");
-    const reportan = inc.recordset.filter(i => nombresValidos.has(i.Empleado)).length;
+    // Misma regla que el escritorio: quién reportó se identifica por IdUsuarioReporta y, en tickets
+    // antiguos sin ese dato, por el nombre. Los tickets anulados no cuentan.
+    const r = await pool.request().query(`
+      SELECT COUNT(*)::int AS Total,
+             COUNT(*) FILTER (WHERE EXISTS (
+               SELECT 1 FROM Incidencias i JOIN Estados e ON e.IdEstado = i.IdEstado
+               WHERE e.Nombre <> 'Anulado'
+                 AND (i.IdUsuarioReporta = u.IdUsuario
+                      OR (i.IdUsuarioReporta IS NULL
+                          AND LOWER(LTRIM(RTRIM(i.Empleado))) = LOWER(LTRIM(RTRIM(u.Nombre)) || ' ' || LTRIM(RTRIM(u.Apellido)))))
+             ))::int AS Reportan
+      FROM Usuarios u
+      WHERE u.Rol = 'Usuario' AND u.Estado = TRUE`);
+    const fila = r.recordset[0];
+    const totalUsuariosActivos = fila.Total ?? fila.total;
+    const reportan = fila.reportan ?? fila.Reportan;
 
     const corr = await pool.request().query("SELECT COUNT(*)::int AS Total FROM Usuarios WHERE Estado = TRUE AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
 

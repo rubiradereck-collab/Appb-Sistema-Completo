@@ -17,7 +17,9 @@ namespace Reportes
         public string Etiqueta { get; set; }
         public DateTime Desde { get; set; }
         public DateTime Hasta { get; set; }
+        /// <summary>Tickets del período sin contar los anulados.</summary>
         public int Registradas { get; set; }
+        public int Anuladas { get; set; }
         public int Resueltas { get; set; }
         public double? PorcentajeResueltas { get; set; }
         public double? TiempoResolucionHoras { get; set; }
@@ -104,7 +106,7 @@ namespace Reportes
                 datos.PrimerMes = conDatos.FirstOrDefault() ?? datos.Meses.First();
                 datos.UltimoMes = conDatos.LastOrDefault() ?? datos.Meses.Last();
 
-                var enRango = todas.Where(i => i.Fecha.Date >= desde && i.Fecha.Date <= hasta).ToList();
+                var enRango = todas.Where(i => i.Fecha.Date >= desde && i.Fecha.Date <= hasta && i.NombreEstado != "Anulado").ToList();
                 datos.Tipos = enRango
                     .GroupBy(i => new { i.IdTipoIncidencia, Nombre = string.IsNullOrWhiteSpace(i.TipoIncidencia) ? "Sin tipo" : i.TipoIncidencia.Trim() })
                     .Select(g => new TipoFrecuente
@@ -129,7 +131,9 @@ namespace Reportes
         private static ResumenPeriodo Resumir(string etiqueta, List<Incidencia> todas, DateTime desde, DateTime hasta,
             List<Usuario> usuariosActivos, List<GuiaEnvio> envios)
         {
-            var incs = todas.Where(i => i.Fecha.Date >= desde && i.Fecha.Date <= hasta).ToList();
+            // Los anulados (duplicados, reportados por error) se cuentan aparte y no entran en los indicadores
+            var delPeriodo = todas.Where(i => i.Fecha.Date >= desde && i.Fecha.Date <= hasta).ToList();
+            var incs = delPeriodo.Where(i => i.NombreEstado != "Anulado").ToList();
             var m = new MetricasIncidencias { Total = incs.Count };
             MetricasHelper.CalcularIndicadoresEtapa3(m, incs);
 
@@ -142,6 +146,7 @@ namespace Reportes
                 Desde = desde,
                 Hasta = hasta,
                 Registradas = incs.Count,
+                Anuladas = delPeriodo.Count - incs.Count,
                 Resueltas = resueltas.Count,
                 PorcentajeResueltas = incs.Count > 0 ? resueltas.Count * 100.0 / incs.Count : (double?)null,
                 TiempoResolucionHoras = resueltas.Count > 0 ? resueltas.Average(i => (i.FechaSolucion.Value - i.Fecha).TotalHours) : (double?)null,
@@ -206,7 +211,7 @@ namespace Reportes
             {
                 new FilaComparativa
                 {
-                    Indicador = "Incidencias registradas",
+                    Indicador = "Incidencias registradas (sin anuladas)",
                     Base = lb?.TotalIncidencias?.ToString() ?? "—",
                     Primero = d.PrimerMes.Registradas.ToString(),
                     Ultimo = d.UltimoMes.Registradas.ToString(),
@@ -365,12 +370,12 @@ namespace Reportes
                                 table.ColumnsDefinition(c =>
                                 {
                                     c.RelativeColumn(2);
-                                    for (int i = 0; i < 8; i++) c.RelativeColumn(1);
+                                    for (int i = 0; i < 9; i++) c.RelativeColumn(1);
                                 });
                                 table.Header(h =>
                                 {
                                     void Cab(string t) => h.Cell().Element(c => c.Background(ColorAcero).Padding(5)).Text(t).FontColor(Colors.White).Bold().FontSize(8);
-                                    Cab("Mes"); Cab("Registradas"); Cab("Resueltas"); Cab("T. resol. (h)"); Cab("T. 1.ª resp. (h)");
+                                    Cab("Mes"); Cab("Registradas"); Cab("Anuladas"); Cab("Resueltas"); Cab("T. resol. (h)"); Cab("T. 1.ª resp. (h)");
                                     Cab("SLA"); Cab("Satisfacción"); Cab("Adopción"); Cab("Guías (personas)");
                                 });
                                 int n = 0;
@@ -380,6 +385,7 @@ namespace Reportes
                                     void Celda(string t) => table.Cell().Background(fondo).BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(4).Text(t ?? "—");
                                     Celda(m.Etiqueta);
                                     Celda(m.Registradas.ToString());
+                                    Celda(m.Anuladas.ToString());
                                     Celda(m.Resueltas.ToString());
                                     Celda(Num(m.TiempoResolucionHoras));
                                     Celda(Num(m.TiempoPrimeraRespuestaHoras));
@@ -450,6 +456,7 @@ namespace Reportes
 
                             col.Item().PaddingTop(10).Text(
                                 "Notas: el SLA se mide sobre tickets resueltos o cerrados (Alta 4 h, Media 24 h, Baja 72 h). " +
+                                "Los tickets anulados se muestran aparte y no cuentan en los demás indicadores. " +
                                 "La primera respuesta y la satisfacción solo existen para tickets creados después de su incorporación al sistema. " +
                                 $"La adopción se calcula sobre {d.UsuariosActivos} usuario(s) activo(s) con rol Usuario.")
                                 .FontSize(7).FontColor(Colors.Grey.Medium).Italic();
@@ -514,24 +521,25 @@ namespace Reportes
 
                     // Hoja 2: mes a mes (números, para graficar en Excel)
                     var meses = workbook.Worksheets.Add("Mes a mes");
-                    Encabezados(meses, 1, "Mes", "Registradas", "Resueltas", "% Resueltas", "T. resolución (h)", "T. 1.ª respuesta (h)",
+                    Encabezados(meses, 1, "Mes", "Registradas", "Anuladas", "Resueltas", "% Resueltas", "T. resolución (h)", "T. 1.ª respuesta (h)",
                         "% SLA cumplido", "Tickets evaluados SLA", "Satisfacción (1-5)", "Calificaciones", "% Adopción", "Envíos de guías", "Personas con guías");
                     f = 2;
                     foreach (var m in d.Meses.Concat(new[] { d.Total }))
                     {
                         meses.Cell(f, 1).Value = m.Etiqueta;
                         meses.Cell(f, 2).Value = m.Registradas;
-                        meses.Cell(f, 3).Value = m.Resueltas;
-                        Numero(meses.Cell(f, 4), m.PorcentajeResueltas);
-                        Numero(meses.Cell(f, 5), m.TiempoResolucionHoras);
-                        Numero(meses.Cell(f, 6), m.TiempoPrimeraRespuestaHoras);
-                        Numero(meses.Cell(f, 7), m.PorcentajeSlaCumplido);
-                        meses.Cell(f, 8).Value = m.TicketsEvaluadosSla;
-                        Numero(meses.Cell(f, 9), m.Satisfaccion);
-                        meses.Cell(f, 10).Value = m.Calificaciones;
-                        Numero(meses.Cell(f, 11), m.Adopcion);
-                        meses.Cell(f, 12).Value = m.EnviosGuias;
-                        meses.Cell(f, 13).Value = m.DestinatariosGuias;
+                        meses.Cell(f, 3).Value = m.Anuladas;
+                        meses.Cell(f, 4).Value = m.Resueltas;
+                        Numero(meses.Cell(f, 5), m.PorcentajeResueltas);
+                        Numero(meses.Cell(f, 6), m.TiempoResolucionHoras);
+                        Numero(meses.Cell(f, 7), m.TiempoPrimeraRespuestaHoras);
+                        Numero(meses.Cell(f, 8), m.PorcentajeSlaCumplido);
+                        meses.Cell(f, 9).Value = m.TicketsEvaluadosSla;
+                        Numero(meses.Cell(f, 10), m.Satisfaccion);
+                        meses.Cell(f, 11).Value = m.Calificaciones;
+                        Numero(meses.Cell(f, 12), m.Adopcion);
+                        meses.Cell(f, 13).Value = m.EnviosGuias;
+                        meses.Cell(f, 14).Value = m.DestinatariosGuias;
                         f++;
                     }
                     meses.Row(f - 1).Style.Font.Bold = true;

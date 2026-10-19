@@ -90,7 +90,9 @@ namespace Reportes
         public static double? Adopcion(List<Incidencia> incidencias, List<Usuario> usuariosActivos)
         {
             if (usuariosActivos == null || usuariosActivos.Count == 0) return null;
-            int reportan = usuariosActivos.Count(u => incidencias.Any(i => Logica.Gestion_de_Logica.IncidenciaLN.EsDelUsuario(i, u)));
+            // Los tickets anulados (duplicados, reportados por error) no cuentan como uso del sistema
+            var validas = incidencias.Where(i => i.NombreEstado != "Anulado").ToList();
+            int reportan = usuariosActivos.Count(u => validas.Any(i => Logica.Gestion_de_Logica.IncidenciaLN.EsDelUsuario(i, u)));
             return Math.Min(100.0, reportan * 100.0 / usuariosActivos.Count);
         }
     }

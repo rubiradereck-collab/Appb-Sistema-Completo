@@ -45,6 +45,10 @@ namespace Entidades.Gestion_de_Entidades
         public long? TelegramChatId { get => telegramChatId; set => telegramChatId = value; }
 
         public byte[] FotoPerfil { get => fotoPerfil; set => fotoPerfil = value; }
+
+        // Etapa 3: área del usuario (para enviar guías por área). NombreArea es solo lectura (viene del listado).
+        public int? IdArea { get; set; }
+        public string NombreArea { get; set; }
     }
 
 }

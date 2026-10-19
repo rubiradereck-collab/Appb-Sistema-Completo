@@ -123,6 +123,12 @@
     <Compile Include="FrmTiposIncidencia.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="FrmEnviarGuias.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FrmInformePeriodo.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="FrmAreas.Designer.cs">
       <DependentUpon>FrmAreas.cs</DependentUpon>
     </Compile>

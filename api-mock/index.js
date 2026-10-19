@@ -57,7 +57,7 @@ const notificarNuevaIncidencia = async (pool, incidencia, origen = "App Móvil",
 const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, _tecnicoId, _nuevoValor, idActor = null) => {
   try {
     const r = await pool.request().input('Id', sql.Int, incidenciaId).query(`
-      SELECT i.NumeroTicket, e.Nombre AS NombreEstado, i.Observaciones,
+      SELECT i.NumeroTicket, e.Nombre AS NombreEstado, i.Observaciones, i.Calificacion,
              t.IdUsuario AS IdTecnico, t.Nombre || ' ' || t.Apellido AS NombreTecnico,
              CASE WHEN t.Estado THEN t.TelegramChatId END AS ChatTecnico,
              u.IdUsuario AS IdReporta,
@@ -82,14 +82,20 @@ const notificarActualizacionIncidencia = async (pool, incidenciaId, accion, _tec
     } else if (accion === 'estado') {
       avisos.push([tecnico, `ℹ️ La ${ticket} ahora está ${estado}.`]);
       const obs = inc.Observaciones ? `\nObservación: ${inc.Observaciones}` : '';
-      avisos.push([reporta, `ℹ️ Tu ${ticket} ahora está ${estado}.${obs}`]);
+      // Etapa 3: al resolver o cerrar se pide la calificación (la respuesta la procesa el Bot)
+      const pedirEncuesta = (estado === 'Resuelto' || estado === 'Cerrado') && inc.Calificacion == null;
+      const encuesta = pedirEncuesta ? '\n\n¿Cómo calificas la atención? (1 = muy mala, 5 = excelente)' : '';
+      const teclado = pedirEncuesta
+        ? { inline_keyboard: [[1, 2, 3, 4, 5].map(n => ({ text: `${n} ⭐`, callback_data: `cal_${incidenciaId}_${n}` }))] }
+        : null;
+      avisos.push([reporta, `ℹ️ Tu ${ticket} ahora está ${estado}.${obs}${encuesta}`, teclado]);
     }
 
     const enviados = new Set();
-    for (const [destino, texto] of avisos) {
+    for (const [destino, texto, teclado] of avisos) {
       if (!destino.chat || destino.id === idActor || enviados.has(String(destino.chat))) continue;
       enviados.add(String(destino.chat));
-      await enviarTelegram(destino.chat, texto);
+      await enviarTelegram(destino.chat, texto, teclado || null);
     }
   } catch (err) {
     console.error('Error al notificar actualizacion', err);
@@ -379,31 +385,60 @@ app.get("/api/areas", async (req, res) => {
   } catch (err) { responderError(res, err); }
 });
 
+// Etapa 3: validación y auditoría de áreas
+const nombreAreaValido = (n) => { const t = (n || "").trim(); return t && t.length <= 100 ? t : null; };
+
 app.post("/api/areas", requireAdmin, async (req, res) => {
   try {
+    const nombre = nombreAreaValido(req.body.NombreArea);
+    if (!nombre) return res.status(400).json({ message: "El nombre del área es obligatorio (máximo 100 caracteres)." });
     const pool = await getDb();
+    const dup = await pool.request().input("Nombre", sql.VarChar, nombre).query("SELECT 1 FROM Areas WHERE NombreArea = @Nombre::citext");
+    if (dup.recordset.length) return res.status(409).json({ message: "Ya existe un área con ese nombre." });
     const result = await pool.request()
-      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .input("NombreArea", sql.VarChar, nombre)
       .query("INSERT INTO Areas (NombreArea) VALUES (@NombreArea) RETURNING IdArea");
-    res.status(201).json({ id: result.recordset[0].IdArea });
+    const id = result.recordset[0].IdArea;
+    await registrarAuditoria(pool, req, "Crear", id, `Área: ${nombre}`, "Área");
+    res.status(201).json({ id });
   } catch (err) { responderError(res, err); }
 });
 
 app.put("/api/areas/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    const nombre = nombreAreaValido(req.body.NombreArea);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    if (!nombre) return res.status(400).json({ message: "El nombre del área es obligatorio (máximo 100 caracteres)." });
     const pool = await getDb();
+    const actual = (await pool.request().input("Id", sql.Int, id).query("SELECT NombreArea FROM Areas WHERE IdArea = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Área no encontrada." });
+    const dup = await pool.request().input("Nombre", sql.VarChar, nombre).input("Id", sql.Int, id)
+      .query("SELECT 1 FROM Areas WHERE NombreArea = @Nombre::citext AND IdArea <> @Id");
+    if (dup.recordset.length) return res.status(409).json({ message: "Ya existe un área con ese nombre." });
     await pool.request()
-      .input("IdArea", sql.Int, req.params.id)
-      .input("NombreArea", sql.VarChar, req.body.NombreArea)
+      .input("IdArea", sql.Int, id)
+      .input("NombreArea", sql.VarChar, nombre)
       .query("UPDATE Areas SET NombreArea = @NombreArea WHERE IdArea = @IdArea");
+    if (actual.NombreArea !== nombre) await registrarAuditoria(pool, req, "Modificar", id, `Área: ${actual.NombreArea} → ${nombre}`, "Área");
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/areas/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
     const pool = await getDb();
-    await pool.request().input("IdArea", sql.Int, req.params.id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
+    const actual = (await pool.request().input("Id", sql.Int, id).query("SELECT NombreArea FROM Areas WHERE IdArea = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Área no encontrada." });
+    try {
+      await pool.request().input("IdArea", sql.Int, id).query("DELETE FROM Areas WHERE IdArea = @IdArea");
+    } catch (dbErr) {
+      if (dbErr.code === "23503") return res.status(409).json({ message: "No se puede eliminar: el área tiene incidencias registradas." });
+      throw dbErr;
+    }
+    await registrarAuditoria(pool, req, "Eliminar", id, `Área: ${actual.NombreArea}`, "Área");
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
@@ -511,10 +546,49 @@ app.delete("/api/tipos-incidencia/:id", requireAdmin, async (req, res) => {
   } catch (err) { responderError(res, err); }
 });
 
+// ===== Guías (Etapa 3: tipo de incidencia, auditoría y registro de envíos) =====
+const escaparHtml = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function registrarEnvioGuias(pool, req, { tipoDestino, idArea = null, destinatarios, idsGuias, canal = "App" }) {
+  try {
+    const u = await pool.request().input("Id", sql.Int, req.user.IdUsuario).query("SELECT Nombre, Apellido FROM Usuarios WHERE IdUsuario = @Id");
+    const nombre = u.recordset[0] ? `${u.recordset[0].Nombre} ${u.recordset[0].Apellido}` : "Desconocido";
+    await pool.request()
+      .input("IdUsuario", sql.Int, req.user.IdUsuario)
+      .input("Nombre", sql.VarChar, nombre)
+      .input("Canal", sql.VarChar, canal)
+      .input("Tipo", sql.VarChar, tipoDestino)
+      .input("IdArea", sql.Int, idArea)
+      .input("Destinatarios", sql.Text, destinatarios.join(", "))
+      .input("Total", sql.Int, destinatarios.length)
+      .input("Guias", sql.Text, idsGuias.map(Number).filter(n => Number.isInteger(n)))
+      .query("SELECT sp_guiasenvios_registrar(@IdUsuario, @Nombre, @Canal, @Tipo, @IdArea, @Destinatarios, @Total, @Guias::int[])");
+  } catch (err) {
+    console.error("Error registrando envío de guías:", err.message);
+  }
+}
+
+async function validarTipoGuia(pool, valor) {
+  if (valor === undefined || valor === null || valor === "" || Number(valor) === 0) return { id: null };
+  const id = aEntero(valor);
+  if (!id) return { error: "Tipo de incidencia inválido." };
+  const r = await pool.request().input("Id", sql.Int, id).query("SELECT 1 FROM TiposIncidencia WHERE IdTipoIncidencia = @Id");
+  if (!r.recordset.length) return { error: "El tipo de incidencia no existe." };
+  return { id };
+}
+
+function validarGuia({ Titulo, Problema, Solucion }) {
+  if (!Titulo || !Titulo.trim() || Titulo.trim().length > 150) return "El título es obligatorio (máximo 150 caracteres).";
+  if (!Problema || !Problema.trim()) return "Indica el problema que resuelve la guía.";
+  if (!Solucion || !Solucion.trim()) return "Indica la solución de la guía.";
+  return null;
+}
+
 app.get("/api/guias", async (req, res) => {
   try {
     const pool = await getDb();
-    const result = await pool.request().query("SELECT * FROM Guias");
+    const result = await pool.request().query(
+      "SELECT g.*, t.Nombre AS NombreTipo FROM Guias g LEFT JOIN TiposIncidencia t ON t.IdTipoIncidencia = g.IdTipoIncidencia ORDER BY g.Titulo");
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
 });
@@ -522,11 +596,11 @@ app.get("/api/guias", async (req, res) => {
 app.post("/api/guias/:id/enviar", async (req, res) => {
   try {
     const { correoDestino } = req.body;
-    if (!correoDestino) return res.status(400).json({ error: "correoDestino es requerido" });
+    if (!correoDestino || !REGEX_CORREO.test(String(correoDestino).trim())) return res.status(400).json({ error: "correoDestino es requerido y debe ser válido" });
     
     const pool = await getDb();
     const result = await pool.request()
-      .input("IdGuia", sql.Int, req.params.id)
+      .input("IdGuia", sql.Int, aEntero(req.params.id))
       .query("SELECT * FROM Guias WHERE IdGuia = @IdGuia");
       
     if (result.recordset.length === 0) return res.status(404).json({ error: "Guía no encontrada" });
@@ -540,17 +614,18 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
         to: correoDestino,
         subject: `Guías de Ayuda - Sistema de Incidencias APPB`,
         html: `
-          <h2 style="color: #2b6b9a;">${guia.Titulo}</h2>
+          <h2 style="color: #2b6b9a;">${escaparHtml(guia.Titulo)}</h2>
           <hr />
           <h4 style="color: #153250;">Problema:</h4>
-          <p>${guia.Problema.replace(/\n/g, '<br/>')}</p>
+          <p>${escaparHtml(guia.Problema).replace(/\n/g, '<br/>')}</p>
           <br/>
           <h4 style="color: #153250;">Solución recomendada:</h4>
-          <p>${guia.Solucion.replace(/\n/g, '<br/>')}</p>
+          <p>${escaparHtml(guia.Solucion).replace(/\n/g, '<br/>')}</p>
           <hr />
           <p style="font-size: 12px; color: gray;">Generado por Sistema de Gestión de Incidencias APPB</p>
         `
       });
+      await registrarEnvioGuias(pool, req, { tipoDestino: "Correo", destinatarios: [String(correoDestino).trim()], idsGuias: [guia.IdGuia] });
       res.json({ success: true, message: "Correo enviado exitosamente" });
     } catch (mailErr) {
       console.error("Error al enviar guía:", mailErr.message);
@@ -561,38 +636,75 @@ app.post("/api/guias/:id/enviar", async (req, res) => {
 
 app.post("/api/guias", requireAdmin, async (req, res) => {
   try {
+    const error = validarGuia(req.body);
+    if (error) return res.status(400).json({ message: error });
     const { Titulo, Problema, Solucion } = req.body;
     const pool = await getDb();
-    await pool.request()
-      .input("Titulo", sql.VarChar, Titulo)
+    const tipo = await validarTipoGuia(pool, req.body.IdTipoIncidencia);
+    if (tipo.error) return res.status(400).json({ message: tipo.error });
+    const dup = await pool.request().input("T", sql.VarChar, Titulo.trim()).query("SELECT 1 FROM Guias WHERE LOWER(Titulo) = LOWER(@T)");
+    if (dup.recordset.length) return res.status(409).json({ message: "Ya existe una guía con ese título." });
+    const r = await pool.request()
+      .input("Titulo", sql.VarChar, Titulo.trim())
       .input("Problema", sql.VarChar, Problema)
       .input("Solucion", sql.VarChar, Solucion)
-      .query("INSERT INTO Guias (Titulo, Problema, Solucion) VALUES (@Titulo, @Problema, @Solucion)");
-    res.json({ success: true });
+      .input("IdTipo", sql.Int, tipo.id)
+      .query("INSERT INTO Guias (Titulo, Problema, Solucion, IdTipoIncidencia) VALUES (@Titulo, @Problema, @Solucion, @IdTipo) RETURNING IdGuia");
+    const id = r.recordset[0].IdGuia;
+    await registrarAuditoria(pool, req, "Crear", id, `Guía: ${Titulo.trim()}`, "Guía");
+    res.json({ success: true, id });
   } catch (err) { responderError(res, err); }
 });
 
 app.put("/api/guias/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    const error = validarGuia(req.body);
+    if (error) return res.status(400).json({ message: error });
     const { Titulo, Problema, Solucion } = req.body;
     const pool = await getDb();
+    const actual = (await pool.request().input("Id", sql.Int, id).query("SELECT IdTipoIncidencia FROM Guias WHERE IdGuia = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Guía no encontrada." });
+    // Si la app anterior no envía el tipo, se conserva el que tenía
+    const tipo = req.body.IdTipoIncidencia === undefined ? { id: actual.IdTipoIncidencia } : await validarTipoGuia(pool, req.body.IdTipoIncidencia);
+    if (tipo.error) return res.status(400).json({ message: tipo.error });
+    const dup = await pool.request().input("T", sql.VarChar, Titulo.trim()).input("Id", sql.Int, id)
+      .query("SELECT 1 FROM Guias WHERE LOWER(Titulo) = LOWER(@T) AND IdGuia <> @Id");
+    if (dup.recordset.length) return res.status(409).json({ message: "Ya existe una guía con ese título." });
     await pool.request()
-      .input("IdGuia", sql.Int, req.params.id)
-      .input("Titulo", sql.VarChar, Titulo)
+      .input("IdGuia", sql.Int, id)
+      .input("Titulo", sql.VarChar, Titulo.trim())
       .input("Problema", sql.VarChar, Problema)
       .input("Solucion", sql.VarChar, Solucion)
-      .query("UPDATE Guias SET Titulo = @Titulo, Problema = @Problema, Solucion = @Solucion WHERE IdGuia = @IdGuia");
+      .input("IdTipo", sql.Int, tipo.id)
+      .query("UPDATE Guias SET Titulo = @Titulo, Problema = @Problema, Solucion = @Solucion, IdTipoIncidencia = @IdTipo WHERE IdGuia = @IdGuia");
+    await registrarAuditoria(pool, req, "Modificar", id, `Guía: ${Titulo.trim()}`, "Guía");
     res.json({ success: true });
   } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
     const pool = await getDb();
+    const actual = (await pool.request().input("Id", sql.Int, id).query("SELECT Titulo FROM Guias WHERE IdGuia = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "Guía no encontrada." });
     await pool.request()
-      .input("IdGuia", sql.Int, req.params.id)
+      .input("IdGuia", sql.Int, id)
       .query("DELETE FROM Guias WHERE IdGuia = @IdGuia");
+    await registrarAuditoria(pool, req, "Eliminar", id, `Guía: ${actual.Titulo}`, "Guía");
     res.json({ success: true });
+  } catch (err) { responderError(res, err); }
+});
+
+// Historial de envíos de guías (Etapa 3)
+app.get("/api/guias-envios", requireAdmin, async (req, res) => {
+  try {
+    const pool = await getDb();
+    const r = await pool.request().query("SELECT * FROM sp_guiasenvios_listar()");
+    res.json(r.recordset);
   } catch (err) { responderError(res, err); }
 });
 
@@ -606,9 +718,13 @@ app.get("/api/auditoria", requireAdmin, async (req, res) => {
 
 app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
   try {
-    const { pdfBase64, filename, email, sendToAll, asunto, mensaje } = req.body;
+    const { pdfBase64, filename, email, sendToAll, asunto, mensaje, esGuias, idsGuias } = req.body;
+    // Etapa 3: envío a los usuarios de un área (solo para guías)
+    const idArea = req.body.idArea ? aEntero(req.body.idArea) : null;
+    const masivo = !!sendToAll || !!idArea;
     if (!pdfBase64) return res.status(400).json({ message: "Falta el PDF" });
-    if (!sendToAll && !email) return res.status(400).json({ message: "Falta el correo destino" });
+    if (Number.isNaN(idArea)) return res.status(400).json({ message: "Área inválida" });
+    if (!masivo && !email) return res.status(400).json({ message: "Falta el correo destino" });
 
     const transporter = getTransporter();
     if (!transporter) return res.status(503).json({ message: "Servicio de correo no configurado" });
@@ -619,18 +735,32 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
       encoding: "base64"
     };
     const remitente = `"Sistema de Incidencias APPB" <${process.env.SMTP_USER}>`;
-    const subject = asunto || (sendToAll ? "Guías de Ayuda - Sistema de Incidencias APPB" : "Reporte de Incidencias - Sistema APPB");
-    const text = mensaje || (sendToAll
+    const subject = asunto || (masivo || esGuias ? "Guías de Ayuda - Sistema de Incidencias APPB" : "Reporte de Incidencias - Sistema APPB");
+    const text = mensaje || (masivo || esGuias
       ? "Adjunto encontrará el catálogo de guías rápidas de solución a problemas frecuentes."
       : "Adjunto encontrará el reporte generado desde el Sistema de Incidencias APPB.");
 
     const pool = await getDb();
 
-    if (sendToAll) {
-      // Todos los usuarios activos con correo, en copia oculta y por lotes de 50
-      const r = await pool.request().query("SELECT Correo FROM Usuarios WHERE Estado = TRUE AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''");
-      const destinatarios = r.recordset.map(u => u.Correo.trim());
-      if (destinatarios.length === 0) return res.status(400).json({ message: "No hay usuarios activos con correo" });
+    // Las guías enviadas desde la app anterior llegan como envío masivo sin "esGuias"
+    const sonGuias = !!esGuias || masivo;
+    const listaGuias = Array.isArray(idsGuias) ? idsGuias : [];
+
+    if (masivo) {
+      // Usuarios activos con correo (todos o los de un área), en copia oculta y por lotes de 50
+      const consulta = pool.request();
+      let filtro = "";
+      if (idArea) {
+        const a = await pool.request().input("Id", sql.Int, idArea).query("SELECT NombreArea FROM Areas WHERE IdArea = @Id");
+        if (!a.recordset.length) return res.status(400).json({ message: "El área no existe" });
+        consulta.input("IdArea", sql.Int, idArea);
+        filtro = " AND IdArea = @IdArea";
+      }
+      const r = await consulta.query("SELECT Correo FROM Usuarios WHERE Estado = TRUE AND Correo IS NOT NULL AND LTRIM(RTRIM(Correo)) <> ''" + filtro);
+      const destinatarios = [...new Set(r.recordset.map(u => u.Correo.trim().toLowerCase()))];
+      if (destinatarios.length === 0) {
+        return res.status(400).json({ message: idArea ? "No hay usuarios activos con correo en esa área. Asígnales el área en Usuarios." : "No hay usuarios activos con correo" });
+      }
 
       for (let i = 0; i < destinatarios.length; i += 50) {
         await transporter.sendMail({
@@ -641,12 +771,18 @@ app.post("/api/reportes/enviar", requireAdmin, async (req, res) => {
           attachments: [adjunto]
         });
       }
-      await registrarAuditoria(pool, req, "Enviar correo masivo", null, `${adjunto.filename} enviado a ${destinatarios.length} destinatarios (BCC)`, "Correo");
+      await registrarAuditoria(pool, req, "Enviar correo masivo", null, `${adjunto.filename} enviado a ${destinatarios.length} destinatarios (BCC)${idArea ? " del área " + idArea : ""}`, "Correo");
+      if (sonGuias) {
+        await registrarEnvioGuias(pool, req, { tipoDestino: idArea ? "Area" : "Todos", idArea, destinatarios, idsGuias: listaGuias });
+      }
       return res.json({ success: true, message: `Correo enviado a ${destinatarios.length} usuarios.` });
     }
 
     await transporter.sendMail({ from: remitente, to: email, subject, text, attachments: [adjunto] });
     await registrarAuditoria(pool, req, "Enviar correo", null, `${adjunto.filename} enviado a ${email}`, "Correo");
+    if (esGuias) {
+      await registrarEnvioGuias(pool, req, { tipoDestino: "Correo", destinatarios: [String(email).trim()], idsGuias: listaGuias });
+    }
     res.json({ success: true, message: `Correo enviado exitosamente a ${email}` });
   } catch (err) {
     console.error("Error enviando correo:", err.message);
@@ -678,7 +814,10 @@ app.get("/api/usuarios", requireAdmin, async (req, res) => {
     const pool = await getDb();
     // Sin Password (hash) ni FotoPerfil: el listado no los necesita y no deben salir del servidor
     const result = await pool.request().query(
-      "SELECT IdUsuario, Nombre, Apellido, Correo, Usuario, Rol, Estado, TelegramChatId, IntentosFallidos, BloqueadoHasta FROM Usuarios ORDER BY Apellido, Nombre");
+      `SELECT u.IdUsuario, u.Nombre, u.Apellido, u.Correo, u.Usuario, u.Rol, u.Estado, u.TelegramChatId, u.IntentosFallidos, u.BloqueadoHasta,
+              u.IdArea, a.NombreArea
+       FROM Usuarios u LEFT JOIN Areas a ON a.IdArea = u.IdArea
+       ORDER BY u.Apellido, u.Nombre`);
     res.json(result.recordset);
   } catch (err) { responderError(res, err); }
 });
@@ -691,6 +830,17 @@ function validarDatosUsuario({ Nombre, Apellido, Correo, Usuario, Rol }) {
   if (!Usuario || !Usuario.trim() || Usuario.trim().length > 50 || /\s/.test(Usuario.trim())) return "El usuario es obligatorio, sin espacios (máximo 50 caracteres).";
   if (!ROLES_VALIDOS.includes(Rol)) return `Rol inválido. Valores permitidos: ${ROLES_VALIDOS.join(", ")}.`;
   return null;
+}
+
+// Etapa 3: área del usuario (opcional). undefined = no cambia; null/""/0 = sin área.
+async function validarAreaUsuario(pool, valor) {
+  if (valor === undefined) return { omitido: true };
+  if (valor === null || valor === "" || Number(valor) === 0) return { id: null };
+  const id = aEntero(valor);
+  if (!id) return { error: "Área inválida." };
+  const r = await pool.request().input("Id", sql.Int, id).query("SELECT NombreArea FROM Areas WHERE IdArea = @Id");
+  if (!r.recordset.length) return { error: "El área no existe." };
+  return { id, nombre: r.recordset[0].NombreArea };
 }
 
 function mensajeErrorUsuarioBD(dbErr) {
@@ -709,8 +859,10 @@ app.post("/api/usuarios", requireAdmin, async (req, res) => {
     if (error) return res.status(400).json({ message: error });
     if (!req.body.Password || req.body.Password.length < 6) return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres." });
 
-    const hash = await bcrypt.hash(req.body.Password, 10);
     const pool = await getDb();
+    const area = await validarAreaUsuario(pool, req.body.IdArea);
+    if (area.error) return res.status(400).json({ message: area.error });
+    const hash = await bcrypt.hash(req.body.Password, 10);
     let result;
     try {
       result = await pool.request()
@@ -720,14 +872,15 @@ app.post("/api/usuarios", requireAdmin, async (req, res) => {
         .input("Usuario", sql.VarChar, datos.Usuario.trim())
         .input("Password", sql.VarChar, hash)
         .input("Rol", sql.VarChar, datos.Rol)
-        .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos) VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, TRUE, 0) RETURNING IdUsuario");
+        .input("IdArea", sql.Int, area.id ?? null)
+        .query("INSERT INTO Usuarios (Nombre, Apellido, Correo, Usuario, Password, Rol, Estado, IntentosFallidos, IdArea) VALUES (@Nombre, @Apellido, @Correo, @Usuario, @Password, @Rol, TRUE, 0, @IdArea) RETURNING IdUsuario");
     } catch (dbErr) {
       const msg = mensajeErrorUsuarioBD(dbErr);
       if (msg) return res.status(409).json({ message: msg });
       throw dbErr;
     }
     const id = result.recordset[0].IdUsuario;
-    await registrarAuditoria(pool, req, "Crear", id, `Usuario: ${datos.Usuario.trim()} | Rol: ${datos.Rol}`, "Usuario");
+    await registrarAuditoria(pool, req, "Crear", id, `Usuario: ${datos.Usuario.trim()} | Rol: ${datos.Rol}${area.nombre ? " | Área: " + area.nombre : ""}`, "Usuario");
     res.status(201).json({ id });
   } catch (err) { responderError(res, err); }
 });
@@ -783,8 +936,11 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
 
     const pool = await getDb();
     const actual = (await pool.request().input("Id", sql.Int, id)
-      .query("SELECT Nombre, Apellido, Correo, Usuario, Rol, Estado, TelegramChatId FROM Usuarios WHERE IdUsuario = @Id")).recordset[0];
+      .query("SELECT u.Nombre, u.Apellido, u.Correo, u.Usuario, u.Rol, u.Estado, u.TelegramChatId, u.IdArea, a.NombreArea FROM Usuarios u LEFT JOIN Areas a ON a.IdArea = u.IdArea WHERE u.IdUsuario = @Id")).recordset[0];
     if (!actual) return res.status(404).json({ message: "Usuario no encontrado." });
+    const area = await validarAreaUsuario(pool, req.body.IdArea);
+    if (area.error) return res.status(400).json({ message: area.error });
+    const idAreaFinal = area.omitido ? actual.IdArea : area.id;
 
     const estadoNuevo = Estado !== undefined ? !!Estado : true;
     // Un administrador no puede quitarse a sí mismo el acceso ni el rol
@@ -810,10 +966,13 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
         .input("Usuario", sql.VarChar, datos.Usuario.trim())
         .input("Rol", sql.VarChar, Rol)
         .input("Estado", sql.Bit, estadoNuevo)
-        .input("TelegramChatId", sql.BigInt, TelegramChatId || null)
-        .query(`UPDATE Usuarios 
-                SET Nombre = @Nombre, Apellido = @Apellido, Correo = @Correo, 
-                    Usuario = @Usuario, Rol = @Rol, Estado = @Estado, TelegramChatId = @TelegramChatId 
+        // La app móvil no envía TelegramChatId: si no viene, se conserva (antes se desvinculaba)
+        .input("TelegramChatId", sql.BigInt, TelegramChatId === undefined ? actual.TelegramChatId : (TelegramChatId || null))
+        .input("IdArea", sql.Int, idAreaFinal ?? null)
+        .query(`UPDATE Usuarios
+                SET Nombre = @Nombre, Apellido = @Apellido, Correo = @Correo,
+                    Usuario = @Usuario, Rol = @Rol, Estado = @Estado, TelegramChatId = @TelegramChatId,
+                    IdArea = @IdArea
                 WHERE IdUsuario = @IdUsuario`);
     } catch (dbErr) {
       const msg = mensajeErrorUsuarioBD(dbErr);
@@ -832,7 +991,8 @@ app.put("/api/usuarios/:id", requireAdmin, async (req, res) => {
     comparar("Usuario", actual.Usuario, datos.Usuario.trim());
     comparar("Rol", actual.Rol, Rol);
     comparar("Activo", actual.Estado ? "Sí" : "No", estadoNuevo ? "Sí" : "No");
-    comparar("Telegram", actual.TelegramChatId ? "vinculado" : "sin vincular", TelegramChatId ? "vinculado" : "sin vincular");
+    if (TelegramChatId !== undefined) comparar("Telegram", actual.TelegramChatId ? "vinculado" : "sin vincular", TelegramChatId ? "vinculado" : "sin vincular");
+    if (!area.omitido) comparar("Área", actual.NombreArea || "Sin área", area.nombre || "Sin área");
     if (cambios.length > 0) {
       await registrarAuditoria(pool, req, "Modificar", id, cambios.join(" | "), "Usuario");
     }
@@ -1218,6 +1378,24 @@ app.put("/api/incidencias/:id", async (req, res) => {
     
     res.json({ success: true });
   } catch(err) { console.error(err); responderError(res, err); }
+});
+
+// Etapa 3: encuesta de satisfacción (solo quien reportó, una vez, con el ticket Resuelto o Cerrado)
+app.post("/api/incidencias/:id/calificacion", async (req, res) => {
+  try {
+    const id = aEntero(req.params.id);
+    const nota = aEntero(req.body.Calificacion);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
+    if (!nota || nota < 1 || nota > 5) return res.status(400).json({ message: "La calificación debe estar entre 1 y 5." });
+    const pool = await getDb();
+    const r = await pool.request().input("Id", sql.Int, id).input("U", sql.Int, req.user.IdUsuario).input("N", sql.Int, nota)
+      .query("SELECT sp_incidencias_calificar(@Id, @U, @N) AS Resultado");
+    const resultado = r.recordset[0].Resultado ?? r.recordset[0].resultado;
+    if (resultado === 2) return res.status(409).json({ message: "Este ticket ya fue calificado." });
+    if (resultado !== 1) return res.status(403).json({ message: "Solo quien reportó el ticket puede calificarlo, y solo cuando está Resuelto o Cerrado." });
+    await registrarAuditoria(pool, req, "Calificar", id, `Calificación: ${nota} de 5`);
+    res.json({ success: true });
+  } catch (err) { responderError(res, err); }
 });
 
 app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {

@@ -171,6 +171,16 @@ namespace Bot
                 int resueltas = incidenciasDelMes.Count(i => i.NombreEstado == "Resuelto" || i.NombreEstado == "Cerrado");
                 int pendientes = incidenciasDelMes.Count(i => i.NombreEstado == "Pendiente");
 
+                // Etapa 3: SLA cumplido y satisfacción del mes
+                var indicadores = new Reportes.MetricasIncidencias();
+                Reportes.MetricasHelper.CalcularIndicadoresEtapa3(indicadores, incidenciasDelMes);
+                string lineaSla = indicadores.PorcentajeSlaCumplido.HasValue
+                    ? $"{indicadores.PorcentajeSlaCumplido.Value:0.#}% ({indicadores.TicketsEvaluadosSla} ticket(s) evaluados)"
+                    : "sin tickets resueltos";
+                string lineaSatisfaccion = indicadores.SatisfaccionPromedio.HasValue
+                    ? $"{indicadores.SatisfaccionPromedio.Value:0.0} de 5 ({indicadores.TotalCalificaciones} respuesta(s))"
+                    : "sin respuestas";
+
                 string asunto = $"Reporte Mensual de Incidencias - {nombreMes}";
                 string cuerpo =
                     "Estimado(a) administrador(a):\n\n" +
@@ -178,7 +188,9 @@ namespace Bot
                     "Resumen:\n" +
                     $"  - Incidencias registradas: {incidenciasDelMes.Count} (mes anterior: {incidenciasMesPrevio.Count})\n" +
                     $"  - Resueltas o cerradas: {resueltas}\n" +
-                    $"  - Pendientes: {pendientes}\n\n" +
+                    $"  - Pendientes: {pendientes}\n" +
+                    $"  - SLA cumplido: {lineaSla}\n" +
+                    $"  - Satisfacción: {lineaSatisfaccion}\n\n" +
                     "Este correo fue generado automáticamente por el Sistema de Incidencias APPB.\n" +
                     "Unidad de Tecnología - Autoridad Portuaria de Puerto Bolívar";
 
@@ -309,7 +321,7 @@ namespace Bot
         }
 
         /// <summary>Avisa (texto plano) a quien reportó el ticket, si tiene Telegram vinculado.</summary>
-        static async Task NotificarReportante(int idIncidencia, string texto, long? excepto = null)
+        static async Task NotificarReportante(int idIncidencia, string texto, long? excepto = null, InlineKeyboardMarkup teclado = null)
         {
             try
             {
@@ -323,11 +335,58 @@ namespace Bot
 
                 if (reportante?.TelegramChatId == null || !reportante.Estado || reportante.TelegramChatId == excepto) return;
 
-                await botClient.SendMessage(reportante.TelegramChatId.Value, texto);
+                await botClient.SendMessage(reportante.TelegramChatId.Value, texto, replyMarkup: teclado);
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "No se pudo avisar al reportante del ticket {Id}.", idIncidencia);
+            }
+        }
+
+        /// <summary>Etapa 3: botones de la encuesta de satisfacción (1 a 5).</summary>
+        static InlineKeyboardMarkup TecladoEncuesta(int idIncidencia)
+        {
+            return new InlineKeyboardMarkup(new[]
+            {
+                Enumerable.Range(1, 5)
+                    .Select(n => InlineKeyboardButton.WithCallbackData($"{n} ⭐", $"cal_{idIncidencia}_{n}"))
+                    .ToArray()
+            });
+        }
+
+        /// <summary>Etapa 3: respuesta a la encuesta (botón cal_ID_N).</summary>
+        static async Task ProcesarCalificacion(CallbackQuery callbackQuery)
+        {
+            long chatId = callbackQuery.Message.Chat.Id;
+            string[] partes = callbackQuery.Data.Split('_');
+            if (partes.Length != 3 || !int.TryParse(partes[1], out int idIncidencia) || !int.TryParse(partes[2], out int nota))
+            {
+                await botClient.AnswerCallbackQuery(callbackQuery.Id);
+                return;
+            }
+
+            var usuario = new UsuarioLN().BuscarPorChatId(chatId);
+            string resultado = new IncidenciaLN().Calificar(idIncidencia, usuario, nota);
+
+            if (resultado == "OK")
+            {
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, "¡Gracias por tu respuesta!");
+                Log.Information("Ticket {Id} calificado con {Nota} desde Telegram.", idIncidencia, nota);
+                try
+                {
+                    await botClient.EditMessageText(chatId, callbackQuery.Message.MessageId,
+                        callbackQuery.Message.Text + $"\n\n✅ Calificaste la atención con {nota} de 5. ¡Gracias!");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "No se pudo actualizar el mensaje de la encuesta.");
+                }
+            }
+            else
+            {
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, resultado, showAlert: true);
+                try { await botClient.EditMessageReplyMarkup(chatId, callbackQuery.Message.MessageId, replyMarkup: null); }
+                catch { /* el mensaje pudo haberse editado ya */ }
             }
         }
 
@@ -535,6 +594,13 @@ namespace Bot
                 await botClient.AnswerCallbackQuery(callbackQuery.Id);
                 // Borramos el mensaje de "escribe una observación"
                 await botClient.DeleteMessage(chatId, callbackQuery.Message.MessageId);
+                return;
+            }
+
+            // --- Etapa 3: respuesta a la encuesta de satisfacción ---
+            if (datosBoton.StartsWith("cal_"))
+            {
+                await ProcesarCalificacion(callbackQuery);
                 return;
             }
 
@@ -765,8 +831,12 @@ namespace Bot
 
                     // Etapa 2: avisar a quien reportó
                     var ticket = logica.ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia);
-                    await NotificarReportante(idIncidencia,
-                        $"ℹ️ Tu {ticket?.NumeroTicket ?? "solicitud"} ahora está {nuevoEstado}.\nObservación del técnico: {observacion}", excepto: chatId);
+                    // Etapa 3: si quedó Resuelto o Cerrado, se pide la calificación
+                    bool pedirEncuesta = (nuevoEstado == "Resuelto" || nuevoEstado == "Cerrado") && ticket != null && !ticket.Calificacion.HasValue;
+                    string textoAviso = $"ℹ️ Tu {ticket?.NumeroTicket ?? "solicitud"} ahora está {nuevoEstado}.\nObservación del técnico: {observacion}";
+                    if (pedirEncuesta) textoAviso += "\n\n¿Cómo calificas la atención? (1 = muy mala, 5 = excelente)";
+                    await NotificarReportante(idIncidencia, textoAviso, excepto: chatId,
+                        teclado: pedirEncuesta ? TecladoEncuesta(idIncidencia) : null);
 
                     // Quitar los botones del mensaje original para que no se puedan volver a presionar
                     var mensajeOriginal = logica.ObtenerMensajesTelegram(idIncidencia)

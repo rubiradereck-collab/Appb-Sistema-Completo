@@ -34,6 +34,7 @@ namespace Presentacion
 
             toolTip1.SetToolTip(btnRefrescar, "Actualizar las métricas y gráficos");
             toolTip1.SetToolTip(btnEnviarCorreo, "Enviar el reporte del periodo seleccionado por correo");
+            AgregarBotonInforme();
 
             ConfigurarChart(chartEstado, "Incidencias por Estado", "Estado");
             ConfigurarChart(chartPrioridad, "Incidencias por Prioridad", "Prioridad");
@@ -56,6 +57,32 @@ namespace Presentacion
         }
 
         // ================== DISEÑO ==================
+
+        // Etapa 3: informe del período completo y línea base (mismo estilo que "Refrescar").
+        // Va a la izquierda de "Enviar por correo", anclado a la derecha igual que ese botón.
+        private void AgregarBotonInforme()
+        {
+            var btnInforme = new Button
+            {
+                Text = "📑 Informe final",
+                Location = new Point(btnEnviarCorreo.Left - 166, btnEnviarCorreo.Top),
+                Size = new Size(160, btnEnviarCorreo.Height),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = btnRefrescar.BackColor,
+                ForeColor = btnRefrescar.ForeColor,
+                Font = btnRefrescar.Font,
+                Cursor = Cursors.Hand
+            };
+            btnInforme.FlatAppearance.BorderSize = 0;
+            btnInforme.Click += (s, e) =>
+            {
+                using (var frm = new FrmInformePeriodo(_usuarioActual))
+                    frm.ShowDialog(this);
+            };
+            btnRefrescar.Parent.Controls.Add(btnInforme);
+            toolTip1.SetToolTip(btnInforme, "Informe del período completo: comparativo con la línea base, primer y último mes");
+        }
 
         private void EstilizarTarjetaAdopcion()
         {

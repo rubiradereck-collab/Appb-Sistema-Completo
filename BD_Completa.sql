@@ -7,6 +7,7 @@
        \c dbincidencias
        \i BD_Completa.sql
        \i BD_Etapa2.sql        (catálogo de tipos, fechas de asignación, estado Anulado)
+       \i BD_Etapa3.sql        (área de usuarios, guías por tipo, envíos, encuesta, línea base)
 
    Notas de la migración:
    - Los nombres de tablas, columnas y funciones van sin comillas, así que

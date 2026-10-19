@@ -25,6 +25,10 @@ namespace Presentacion
         private readonly UsuarioLN usuarioLN = new UsuarioLN();
         private List<Usuario> listaUsuarios;
         private Usuario usuarioSeleccionado;
+
+        // Etapa 3: área del usuario (para enviar las guías por área). Se crea por código.
+        private readonly ComboBox cboArea = new ComboBox();
+
         public FrmUsuarios(Usuario usuarioActual)
         {
             InitializeComponent();
@@ -40,8 +44,46 @@ namespace Presentacion
             toolTip1.SetToolTip(btnEliminar, "Eliminar el usuario permanentemente");
             toolTip1.SetToolTip(btnResetPassword, "Generar una contraseña temporal aleatoria");
             toolTip1.SetToolTip(txtPassword, "Dejar vacío para no cambiar la contraseña");
+            CrearComboArea();
             CargarGrid();
             LimpiarFormulario();
+        }
+
+        private void CrearComboArea()
+        {
+            var lblArea = new Label
+            {
+                Text = "Área",
+                AutoSize = true,
+                Font = chkEstado.Font,
+                Location = new Point(chkEstado.Right + 6, chkEstado.Top + 2)
+            };
+            cboArea.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboArea.Font = cboRol.Font;
+            cboArea.Location = new Point(lblArea.Left + 60, chkEstado.Top - 2);
+            cboArea.Width = Math.Max(140, cboRol.Right - cboArea.Left);
+
+            try
+            {
+                var areas = new AreaLN().ShowArea();
+                areas.Insert(0, new Area(0, "(Sin área)"));
+                cboArea.DisplayMember = "NombreArea";
+                cboArea.ValueMember = "IdArea";
+                cboArea.DataSource = areas;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            chkEstado.Parent.Controls.Add(lblArea);
+            chkEstado.Parent.Controls.Add(cboArea);
+            toolTip1.SetToolTip(cboArea, "Área del usuario: se usa para enviarle las guías de su área");
+        }
+
+        private int? AreaSeleccionada()
+        {
+            return cboArea.SelectedValue is int id && id > 0 ? id : (int?)null;
         }
 
         private void CargarGrid()
@@ -79,12 +121,18 @@ namespace Presentacion
             grid.DataSource = null;
             grid.DataSource = listaUsuarios;
 
-            foreach (string columna in new[] { "IdUsuario", "Password", "TelegramChatId" })
+            FormatearColumnas();
+        }
+
+        private void FormatearColumnas()
+        {
+            foreach (string columna in new[] { "IdUsuario", "Password", "TelegramChatId", "IdArea" })
             {
                 if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
             }
             if (grid.Columns["UsuarioLogin"] != null) grid.Columns["UsuarioLogin"].HeaderText = "Usuario";
             if (grid.Columns["Estado"] != null) grid.Columns["Estado"].HeaderText = "Activo";
+            if (grid.Columns["NombreArea"] != null) grid.Columns["NombreArea"].HeaderText = "Área";
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
         private void AplicarBusqueda()
@@ -104,14 +152,7 @@ namespace Presentacion
 
                 grid.DataSource = null;
                 grid.DataSource = listaUsuarios;
-
-                foreach (string columna in new[] { "IdUsuario", "Password", "TelegramChatId" })
-                {
-                    if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
-                }
-                if (grid.Columns["UsuarioLogin"] != null) grid.Columns["UsuarioLogin"].HeaderText = "Usuario";
-                if (grid.Columns["Estado"] != null) grid.Columns["Estado"].HeaderText = "Activo";
-                grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                FormatearColumnas();
 
                 lblContador.Text = $"Total: {listaUsuarios.Count} usuario(s)";
                 lblSinDatos.Text = listaUsuarios.Count == 0 ? "No hay usuarios registrados." : "";
@@ -142,6 +183,7 @@ namespace Presentacion
             txtUsuarioLogin.Text = usuarioSeleccionado.UsuarioLogin;
             cboRol.SelectedItem = usuarioSeleccionado.Rol;
             chkEstado.Checked = usuarioSeleccionado.Estado;
+            cboArea.SelectedValue = usuarioSeleccionado.IdArea ?? 0;
 
             // El password nunca se edita directo (es un hash) — se deshabilita
             // y se usa el botón ResetPassword para cambiarlo.
@@ -179,6 +221,7 @@ namespace Presentacion
             txtPassword.Enabled = true;
             cboRol.SelectedIndex = -1;
             chkEstado.Checked = true;
+            if (cboArea.Items.Count > 0) cboArea.SelectedIndex = 0;
             lblTelegramStatus.Text = string.Empty;
             btnResetPassword.Enabled = false;
             txtConfirmarPassword.Clear();
@@ -266,18 +309,29 @@ namespace Presentacion
                     );
                     usuarioLN.InsertUsuario(nuevo);
 
+                    // Etapa 3: el área se guarda aparte; se ubica al usuario recién creado por su login
+                    int? areaNueva = AreaSeleccionada();
+                    if (areaNueva.HasValue)
+                    {
+                        Usuario creado = usuarioLN.ShowUsuario().FirstOrDefault(u =>
+                            string.Equals(u.UsuarioLogin, txtUsuarioLogin.Text.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (creado != null) usuarioLN.AsignarArea(creado.IdUsuario, areaNueva);
+                    }
+
                     auditoriaLN.Registrar(
                         usuarioActual.IdUsuario,
                         $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
                         "Crear",
                         "Usuario",
                         null,
-                        $"Usuario creado: {txtUsuarioLogin.Text} | Rol: {cboRol.SelectedItem}"
+                        $"Usuario creado: {txtUsuarioLogin.Text} | Rol: {cboRol.SelectedItem} | Área: {cboArea.Text}"
                     );
                 }
                 else
                 {
                     string rolAnterior = usuarioSeleccionado.Rol;
+                    int? areaAnterior = usuarioSeleccionado.IdArea;
+                    string nombreAreaAnterior = usuarioSeleccionado.NombreArea ?? "(Sin área)";
                     bool estadoAnterior = usuarioSeleccionado.Estado;
                     bool cambioPassword = !string.IsNullOrWhiteSpace(txtPassword.Text);
 
@@ -297,7 +351,12 @@ namespace Presentacion
                         usuarioLN.UpdateUsuario(usuarioSeleccionado);
                     }
 
+                    int? areaNueva = AreaSeleccionada();
+                    if (areaNueva != areaAnterior)
+                        usuarioLN.AsignarArea(usuarioSeleccionado.IdUsuario, areaNueva);
+
                     string detalle = $"Usuario: {usuarioSeleccionado.UsuarioLogin}";
+                    if (areaNueva != areaAnterior) detalle += $" | Área: {nombreAreaAnterior} → {cboArea.Text}";
                     if (rolAnterior != usuarioSeleccionado.Rol) detalle += $" | Rol: {rolAnterior} → {usuarioSeleccionado.Rol}";
                     if (estadoAnterior != usuarioSeleccionado.Estado) detalle += $" | Activo: {estadoAnterior} → {usuarioSeleccionado.Estado}";
                     if (cambioPassword) detalle += " | Contraseña cambiada";

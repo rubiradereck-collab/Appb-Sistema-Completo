@@ -18,7 +18,11 @@ namespace Logica.Gestion_de_Logica
             {
                 List<sp_Guias_ListarResult> auxLista = GuiaCD.ListarGuias();
                 foreach (sp_Guias_ListarResult obj in auxLista)
-                    lista.Add(new Guia(obj.IdGuia, obj.Titulo, obj.Problema, obj.Solucion));
+                    lista.Add(new Guia(obj.IdGuia, obj.Titulo, obj.Problema, obj.Solucion)
+                    {
+                        IdTipoIncidencia = obj.IdTipoIncidencia,
+                        NombreTipo = obj.NombreTipo
+                    });
             }
             catch (Exception ex)
             {
@@ -33,6 +37,17 @@ namespace Logica.Gestion_de_Logica
             {
                 ValidarGuia(oe);
                 GuiaCD.InsertarGuia(oe);
+
+                // Etapa 3: el tipo se guarda aparte. Los títulos son únicos, así se ubica la guía nueva.
+                if (oe.IdTipoIncidencia.HasValue)
+                {
+                    Guia creada = ShowGuia().FirstOrDefault(g => string.Equals(g.Titulo.Trim(), oe.Titulo.Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (creada != null)
+                    {
+                        oe.IdGuia = creada.IdGuia;
+                        GuiaCD.AsignarTipo(creada.IdGuia, oe.IdTipoIncidencia);
+                    }
+                }
                 return true;
             }
             catch (LogicaExcepciones) { throw; }
@@ -48,6 +63,7 @@ namespace Logica.Gestion_de_Logica
             {
                 ValidarGuia(oe);
                 GuiaCD.ModificarGuia(oe);
+                GuiaCD.AsignarTipo(oe.IdGuia, oe.IdTipoIncidencia);
                 return true;
             }
             catch (LogicaExcepciones) { throw; }
@@ -82,6 +98,9 @@ namespace Logica.Gestion_de_Logica
 
             if (string.IsNullOrWhiteSpace(oe.Solucion))
                 throw new LogicaExcepciones("Debe indicar la solución de la guía.", null);
+
+            if (oe.IdTipoIncidencia.HasValue && !TipoIncidenciaCD.ListarTipos(false).Any(t => t.IdTipoIncidencia == oe.IdTipoIncidencia.Value))
+                throw new LogicaExcepciones("El tipo de incidencia seleccionado no existe.", null);
 
             bool duplicado = ShowGuia().Any(g =>
                 g.IdGuia != oe.IdGuia &&

@@ -60,6 +60,8 @@ namespace Logica.Gestion_de_Logica
                     oc.IdUsuarioReporta = obj.IdUsuarioReporta;
                     oc.FechaAsignacion = obj.FechaAsignacion;
                     oc.FechaPrimeraRespuesta = obj.FechaPrimeraRespuesta;
+                    oc.Calificacion = obj.Calificacion;
+                    oc.FechaCalificacion = obj.FechaCalificacion;
 
                     lista.Add(oc);
                 }
@@ -279,6 +281,32 @@ namespace Logica.Gestion_de_Logica
             catch (Exception ex)
             {
                 throw new LogicaExcepciones("Error al buscar el usuario que reporta", ex);
+            }
+        }
+
+        /// <summary>
+        /// Etapa 3: encuesta de satisfacción. Solo quien reportó puede calificar, una vez,
+        /// cuando el ticket está Resuelto o Cerrado. Devuelve un mensaje para mostrar.
+        /// </summary>
+        public string Calificar(int idIncidencia, Usuario usuario, int calificacion)
+        {
+            if (usuario == null) return "Tu cuenta no está vinculada.";
+            if (calificacion < 1 || calificacion > 5) return "La calificación debe estar entre 1 y 5.";
+            try
+            {
+                int resultado = IncidenciaCD.Calificar(idIncidencia, usuario.IdUsuario, calificacion);
+                if (resultado == 1)
+                {
+                    new AuditoriaLN().Registrar(usuario.IdUsuario, $"{usuario.Nombre} {usuario.Apellido}",
+                        "Calificar", "Incidencia", idIncidencia, $"Calificación: {calificacion} de 5");
+                    return "OK";
+                }
+                if (resultado == 2) return "Este ticket ya fue calificado.";
+                return "Solo quien reportó el ticket puede calificarlo, y solo cuando está Resuelto o Cerrado.";
+            }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al guardar la calificación", ex);
             }
         }
 

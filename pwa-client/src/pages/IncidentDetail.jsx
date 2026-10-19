@@ -23,6 +23,7 @@ const IncidentDetail = () => {
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [enviandoNota, setEnviandoNota] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, isDestructive: false });
 
@@ -101,6 +102,27 @@ const IncidentDetail = () => {
   if (!incidencia) return <div className="p-8 text-center text-red-500">No se encontró la incidencia</div>;
 
   const isTechOrAdmin = user.Rol === 'Técnico' || user.Rol === 'Administrador';
+
+  // Etapa 3: encuesta de satisfacción para quien reportó, con el ticket Resuelto o Cerrado
+  const nombreEstado = estados.find(e => e.IdEstado === incidencia.IdEstado)?.NombreEstado;
+  const nombreYo = `${(user.Nombre || '').trim()} ${(user.Apellido || '').trim()}`.trim().toLowerCase();
+  const esMiTicket = incidencia.IdUsuarioReporta
+    ? incidencia.IdUsuarioReporta === user.IdUsuario
+    : (incidencia.Empleado || '').trim().toLowerCase() === nombreYo;
+  const puedeCalificar = esMiTicket && (nombreEstado === 'Resuelto' || nombreEstado === 'Cerrado') && incidencia.Calificacion == null;
+
+  const enviarCalificacion = async (nota) => {
+    setEnviandoNota(true);
+    try {
+      await api.post(`/incidencias/${id}/calificacion`, { Calificacion: nota });
+      setIncidencia({ ...incidencia, Calificacion: nota });
+      window.dispatchEvent(new CustomEvent('app-success', { detail: '¡Gracias por tu calificación!' }));
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'No se pudo guardar la calificación';
+      window.dispatchEvent(new CustomEvent('app-error', { detail: errorMsg }));
+    }
+    setEnviandoNota(false);
+  };
   const areaName = areas.find(a => a.IdArea === incidencia.IdArea)?.NombreArea || 'N/A';
 
   return (
@@ -267,6 +289,34 @@ const IncidentDetail = () => {
           </div>
 
         </div>
+
+        {(puedeCalificar || (esMiTicket && incidencia.Calificacion != null)) && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mt-4">
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-1">¿Cómo calificas la atención?</h3>
+            {incidencia.Calificacion != null ? (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Calificaste este ticket con {incidencia.Calificacion} de 5 {'⭐'.repeat(incidencia.Calificacion)}. ¡Gracias!
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">1 = muy mala, 5 = excelente</p>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      disabled={enviandoNota}
+                      onClick={() => enviarCalificacion(n)}
+                      className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-200 hover:bg-yellow-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                      aria-label={`Calificar con ${n} de 5`}
+                    >
+                      {n} ⭐
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Confirm Modal */}

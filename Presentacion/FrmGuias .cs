@@ -25,6 +25,9 @@ namespace Presentacion
         private Guia guiaSeleccionada;
         private readonly Usuario usuarioActual;
 
+        // Etapa 3: tipo de incidencia de la guía (se crea por código, junto al título)
+        private readonly ComboBox cboTipo = new ComboBox();
+
         public FrmGuias(Usuario usuarioActual)
         {
             InitializeComponent();
@@ -34,6 +37,7 @@ namespace Presentacion
             grid.SelectionChanged += grid_SelectionChanged;
             txtBuscar.TextChanged += txtBuscar_TextChanged;
             grid.ColumnHeaderMouseClick += grid_ColumnHeaderMouseClick;
+            CrearComboTipo();
             CargarGrid();
             LimpiarFormulario();
             toolTip1.SetToolTip(button1, "Limpiar el formulario para crear una nueva guía");
@@ -47,8 +51,70 @@ namespace Presentacion
                 button1.Enabled = false; // Nuevo
                 button2.Enabled = false; // Guardar
                 button3.Enabled = false; // Eliminar
+                cboTipo.Enabled = false;
             }
 
+        }
+
+        private void CrearComboTipo()
+        {
+            // El título se acorta para dejar sitio al tipo en la misma fila
+            int anchoTotal = txtTitulo.Width;
+            txtTitulo.Width = (int)(anchoTotal * 0.58);
+
+            var lblTipo = new Label
+            {
+                Text = "🧩 Tipo",
+                AutoSize = true,
+                Font = label1.Font,
+                Location = new Point(txtTitulo.Right + 10, label1.Top)
+            };
+            cboTipo.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboTipo.Font = txtTitulo.Font;
+            cboTipo.Location = new Point(txtTitulo.Right + 12, txtTitulo.Top);
+            cboTipo.Width = txtTitulo.Left + anchoTotal - cboTipo.Left;
+
+            txtTitulo.Parent.Controls.Add(lblTipo);
+            txtTitulo.Parent.Controls.Add(cboTipo);
+            toolTip1.SetToolTip(cboTipo, "Tipo de incidencia que resuelve esta guía");
+            CargarTipos(null);
+        }
+
+        /// <summary>Tipos activos más el de la guía abierta (aunque esté desactivado).</summary>
+        private void CargarTipos(int? idTipoDeLaGuia)
+        {
+            try
+            {
+                var tipos = new TipoIncidenciaLN().ShowTipos()
+                    .Where(t => t.Activo || t.IdTipoIncidencia == idTipoDeLaGuia)
+                    .ToList();
+                tipos.Insert(0, new TipoIncidencia(0, "(Sin tipo)", true));
+                cboTipo.DataSource = null;
+                cboTipo.DisplayMember = "Nombre";
+                cboTipo.ValueMember = "IdTipoIncidencia";
+                cboTipo.DataSource = tipos;
+                cboTipo.SelectedValue = idTipoDeLaGuia ?? 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private int? TipoSeleccionado()
+        {
+            return cboTipo.SelectedValue is int id && id > 0 ? id : (int?)null;
+        }
+
+        private void FormatearColumnas()
+        {
+            foreach (string columna in new[] { "IdGuia", "Problema", "Solucion", "IdTipoIncidencia" })
+            {
+                if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
+            }
+            if (grid.Columns["Titulo"] != null) grid.Columns["Titulo"].HeaderText = "Título";
+            if (grid.Columns["NombreTipo"] != null) grid.Columns["NombreTipo"].HeaderText = "Tipo";
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
 
         private void CargarGrid()
@@ -86,13 +152,7 @@ namespace Presentacion
 
             grid.DataSource = null;
             grid.DataSource = listaGuias;
-
-            foreach (string columna in new[] { "IdGuia", "Problema", "Solucion" })
-            {
-                if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
-            }
-            if (grid.Columns["Titulo"] != null) grid.Columns["Titulo"].HeaderText = "Título";
-            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            FormatearColumnas();
         }
         private void AplicarBusqueda()
         {
@@ -108,13 +168,7 @@ namespace Presentacion
 
                 grid.DataSource = null;
                 grid.DataSource = listaGuias;
-
-                foreach (string columna in new[] { "IdGuia", "Problema", "Solucion" })
-                {
-                    if (grid.Columns[columna] != null) grid.Columns[columna].Visible = false;
-                }
-                if (grid.Columns["Titulo"] != null) grid.Columns["Titulo"].HeaderText = "Título";
-                grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                FormatearColumnas();
 
                 lblContador.Text = $"Total: {listaGuias.Count} guía(s)";
                 lblSinDatos.Text = listaGuias.Count == 0 ? "No hay guías registradas." : "";
@@ -138,6 +192,7 @@ namespace Presentacion
             txtTitulo.Text = guiaSeleccionada.Titulo;
             txtProblema.Text = guiaSeleccionada.Problema;
             txtSolucion.Text = guiaSeleccionada.Solucion;
+            CargarTipos(guiaSeleccionada.IdTipoIncidencia);
         }
 
 
@@ -155,6 +210,7 @@ namespace Presentacion
             txtTitulo.Clear();
             txtProblema.Clear();
             txtSolucion.Clear();
+            CargarTipos(null);
             txtTitulo.Focus();
         }
         private bool ValidarCampos()
@@ -190,15 +246,21 @@ namespace Presentacion
             {
                 if (guiaSeleccionada == null)
                 {
-                    Guia nueva = new Guia(0, txtTitulo.Text, txtProblema.Text, txtSolucion.Text);
+                    Guia nueva = new Guia(0, txtTitulo.Text, txtProblema.Text, txtSolucion.Text)
+                    {
+                        IdTipoIncidencia = TipoSeleccionado()
+                    };
                     guiaLN.InsertGuia(nueva);
+                    RegistrarAuditoria("Crear", nueva.IdGuia > 0 ? nueva.IdGuia : (int?)null, $"Guía: {nueva.Titulo} | Tipo: {cboTipo.Text}");
                 }
                 else
                 {
                     guiaSeleccionada.Titulo = txtTitulo.Text;
                     guiaSeleccionada.Problema = txtProblema.Text;
                     guiaSeleccionada.Solucion = txtSolucion.Text;
+                    guiaSeleccionada.IdTipoIncidencia = TipoSeleccionado();
                     guiaLN.UpdateGuia(guiaSeleccionada);
+                    RegistrarAuditoria("Modificar", guiaSeleccionada.IdGuia, $"Guía: {guiaSeleccionada.Titulo} | Tipo: {cboTipo.Text}");
                 }
 
                 CargarGrid();
@@ -228,6 +290,7 @@ namespace Presentacion
             try
             {
                 guiaLN.DeleteGuia(guiaSeleccionada);
+                RegistrarAuditoria("Eliminar", guiaSeleccionada.IdGuia, $"Guía: {guiaSeleccionada.Titulo}");
                 CargarGrid();
                 LimpiarFormulario();
             }
@@ -235,6 +298,17 @@ namespace Presentacion
             {
                 MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void RegistrarAuditoria(string accion, int? idGuia, string detalle)
+        {
+            try
+            {
+                new AuditoriaLN().Registrar(usuarioActual?.IdUsuario,
+                    usuarioActual != null ? $"{usuarioActual.Nombre} {usuarioActual.Apellido}" : "Desconocido",
+                    accion, "Guía", idGuia, detalle);
+            }
+            catch { /* la auditoría no debe impedir el guardado */ }
         }
 
         private void button4_Click(object sender, EventArgs e)
@@ -333,6 +407,7 @@ namespace Presentacion
                 }
             };
         }
+        // Etapa 3: envío a un correo, a todos o a los usuarios de un área, y registro de cada envío
         private async void btnEnviarCorreo_Click(object sender, EventArgs e)
         {
             if (listaGuias == null || listaGuias.Count == 0)
@@ -341,37 +416,59 @@ namespace Presentacion
                 return;
             }
 
-            var frmEnvio = new FrmEnviarCorreo("", "Guías de Ayuda - Sistema de Incidencias APPB", false, true);
-            frmEnvio.ShowDialog();
-            if (!frmEnvio.ConfirmaEnvio) return;
-
-            string correoDestino = frmEnvio.CorreoDestino;
-            string asunto = frmEnvio.Asunto;
-            string mensaje = string.IsNullOrWhiteSpace(frmEnvio.Mensaje)
-                ? "Adjunto encontrará el catálogo de guías rápidas para solucionar problemas frecuentes."
-                : frmEnvio.Mensaje;
-            bool enviarATodos = frmEnvio.EnviarATodos;
-            var guias = listaGuias.ToList();
-
-            // Destinatarios y confirmación ANTES de generar/enviar (en el hilo de la interfaz)
-            List<string> correosBcc = null;
-            if (enviarATodos)
+            string tipoDestino, correoDestino, nombreArea, asunto, mensaje;
+            int? idArea;
+            List<Guia> guias;
+            using (var dlg = new FrmEnviarGuias(guiaSeleccionada?.Titulo, listaGuias.Count))
             {
-                correosBcc = new UsuarioLN().ShowUsuario()
-                    .Where(u => u.Estado && !string.IsNullOrWhiteSpace(u.Correo) && u.Correo.Contains("@"))
-                    .Select(u => u.Correo.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                TemaModerno.Aplicar(dlg);
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
-                if (correosBcc.Count == 0)
-                {
-                    MessageBox.Show("No hay usuarios activos con correo registrado.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
+                tipoDestino = dlg.TipoDestino;
+                correoDestino = dlg.Correo;
+                idArea = dlg.IdArea;
+                nombreArea = dlg.NombreArea;
+                asunto = dlg.Asunto;
+                mensaje = string.IsNullOrWhiteSpace(dlg.Mensaje)
+                    ? "Adjunto encontrará guías rápidas para solucionar problemas frecuentes."
+                    : dlg.Mensaje;
+                guias = dlg.SoloSeleccionada && guiaSeleccionada != null
+                    ? new List<Guia> { guiaSeleccionada }
+                    : listaGuias.ToList();
+            }
 
+            var envioLN = new GuiaEnvioLN();
+            List<string> destinatarios;
+            try
+            {
+                destinatarios = tipoDestino == GuiaEnvio.DestinoCorreo
+                    ? new List<string> { correoDestino }
+                    : envioLN.ObtenerDestinatarios(idArea);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string descripcionDestino = tipoDestino == GuiaEnvio.DestinoCorreo ? correoDestino
+                : tipoDestino == GuiaEnvio.DestinoArea ? $"los usuarios del área {nombreArea}"
+                : "todos los usuarios activos";
+
+            if (destinatarios.Count == 0)
+            {
+                MessageBox.Show(tipoDestino == GuiaEnvio.DestinoArea
+                        ? $"No hay usuarios activos con correo en el área {nombreArea}. Asigna el área a los usuarios en el módulo Usuarios."
+                        : "No hay usuarios activos con correo registrado.",
+                    "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (tipoDestino != GuiaEnvio.DestinoCorreo)
+            {
                 var resp = MessageBox.Show(
-                    $"Se enviarán las guías a {correosBcc.Count} usuario(s) activo(s) en copia oculta.\n\n¿Desea continuar?",
-                    "Confirmar envío masivo", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    $"Se enviarán {guias.Count} guía(s) a {destinatarios.Count} persona(s) ({descripcionDestino}) en copia oculta.\n\n¿Desea continuar?",
+                    "Confirmar envío", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (resp != DialogResult.Yes) return;
             }
 
@@ -382,18 +479,24 @@ namespace Presentacion
             {
                 await Task.Run(() =>
                 {
-                    byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(guias);
+                    string titulo = guias.Count == 1 ? guias[0].Titulo : "Catálogo de Guías de Ayuda";
+                    byte[] pdf = IncidenciaReportes.GenerarPdfListadoGuias(guias, titulo);
 
-                    if (enviarATodos)
+                    if (tipoDestino == GuiaEnvio.DestinoCorreo)
+                    {
+                        var adjuntos = new List<Tuple<byte[], string>> { new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf") };
+                        CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
+                    }
+                    else
                     {
                         string tempPdf = Path.Combine(Path.GetTempPath(), $"GuiasDeAyuda_{Guid.NewGuid():N}.pdf");
                         File.WriteAllBytes(tempPdf, pdf);
                         try
                         {
                             var adjuntosRutas = new List<string> { tempPdf };
-                            for (int i = 0; i < correosBcc.Count; i += 50)
+                            for (int i = 0; i < destinatarios.Count; i += 50)
                             {
-                                var lote = correosBcc.Skip(i).Take(50).ToList();
+                                var lote = destinatarios.Skip(i).Take(50).ToList();
                                 CorreoService.EnviarCorreoMasivoBcc(lote, asunto, mensaje, adjuntosRutas);
                             }
                         }
@@ -401,29 +504,17 @@ namespace Presentacion
                         {
                             try { File.Delete(tempPdf); } catch { }
                         }
-
-                        new AuditoriaLN().Registrar(usuarioActual.IdUsuario,
-                            $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
-                            "Enviar correo masivo (Guías)", "Guías", null,
-                            $"Guías enviadas a {correosBcc.Count} destinatarios en BCC.");
                     }
-                    else
-                    {
-                        var adjuntos = new List<Tuple<byte[], string>>
-                        {
-                            new Tuple<byte[], string>(pdf, "GuiasDeAyuda.pdf")
-                        };
-                        CorreoService.EnviarCorreoConAdjuntos(correoDestino, asunto, mensaje, adjuntos);
 
-                        new AuditoriaLN().Registrar(usuarioActual.IdUsuario,
-                            $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
-                            "Enviar correo (Guías)", "Guías", null,
-                            $"Destinatario: {correoDestino}");
-                    }
+                    envioLN.Registrar(usuarioActual, tipoDestino, idArea, destinatarios, guias.Select(g => g.IdGuia));
+                    new AuditoriaLN().Registrar(usuarioActual.IdUsuario,
+                        $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
+                        tipoDestino == GuiaEnvio.DestinoCorreo ? "Enviar correo (Guías)" : "Enviar correo masivo (Guías)", "Guías", null,
+                        $"{guias.Count} guía(s) a {destinatarios.Count} destinatario(s): {descripcionDestino}");
                 });
 
-                string destino = enviarATodos ? $"{correosBcc.Count} usuario(s) activo(s)" : correoDestino;
-                MessageBox.Show($"Guías enviadas correctamente a {destino}.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Guías enviadas correctamente a {descripcionDestino} ({destinatarios.Count} destinatario(s)).",
+                    "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {

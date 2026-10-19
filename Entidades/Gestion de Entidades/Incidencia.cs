@@ -88,6 +88,10 @@ namespace Entidades.Gestion_de_Entidades
         public int? IdUsuarioReporta { get => idUsuarioReporta; set => idUsuarioReporta = value; }
         public DateTime? FechaAsignacion { get => fechaAsignacion; set => fechaAsignacion = value; }
         public DateTime? FechaPrimeraRespuesta { get => fechaPrimeraRespuesta; set => fechaPrimeraRespuesta = value; }
+
+        // Etapa 3: encuesta de satisfacción (1 a 5) que responde quien reportó. Solo lectura aquí.
+        public int? Calificacion { get; set; }
+        public DateTime? FechaCalificacion { get; set; }
     }
 
 }

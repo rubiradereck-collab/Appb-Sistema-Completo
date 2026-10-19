@@ -35,7 +35,9 @@ namespace Datos.Gestion_de_Datos
                     IdTipoIncidencia = EnteroNulo(dr, "idtipoincidencia"),
                     IdUsuarioReporta = EnteroNulo(dr, "idusuarioreporta"),
                     FechaAsignacion = FechaNula(dr, "fechaasignacion"),
-                    FechaPrimeraRespuesta = FechaNula(dr, "fechaprimerarespuesta")
+                    FechaPrimeraRespuesta = FechaNula(dr, "fechaprimerarespuesta"),
+                    Calificacion = EnteroNuloConvertido(dr, "calificacion"),
+                    FechaCalificacion = FechaNula(dr, "fechacalificacion")
                 }),
                 "Error al ejecutar el procedimiento Listar incidencias");
         }
@@ -108,6 +110,20 @@ namespace Datos.Gestion_de_Datos
                 P("idestado", NpgsqlDbType.Integer, idNuevoEstado),
                 P("observaciones", NpgsqlDbType.Text, observacion)) == 1,
                 "Error al ejecutar procedimiento de actualización de estado por Telegram");
+        }
+
+        /// <summary>
+        /// Etapa 3: guarda la calificación (1 a 5) de quien reportó.
+        /// Devuelve 1 = guardada, 2 = ya tenía calificación, 0 = no corresponde.
+        /// </summary>
+        public static int Calificar(int idIncidencia, int idUsuario, int calificacion)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_calificar(@id, @idusuario, @calificacion)",
+                P("id", NpgsqlDbType.Integer, idIncidencia),
+                P("idusuario", NpgsqlDbType.Integer, idUsuario),
+                P("calificacion", NpgsqlDbType.Integer, calificacion)),
+                "Error al guardar la calificación");
         }
 
         public static void RegistrarMensajeTelegram(int idIncidencia, long chatId, int messageId)

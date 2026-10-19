@@ -28,6 +28,8 @@ namespace Logica.Gestion_de_Logica
                 {
                     byte[] fotoBytes = obj.FotoPerfil != null ? obj.FotoPerfil.ToArray() : null;
                     oc = new Usuario(obj.IdUsuario, obj.Nombre, obj.Apellido, obj.Correo, obj.Usuario, obj.Password, obj.Rol, obj.Estado, obj.TelegramChatId, fotoBytes);
+                    oc.IdArea = obj.IdArea;
+                    oc.NombreArea = obj.NombreArea;
                     lista.Add(oc);
                 }
             }
@@ -73,7 +75,11 @@ namespace Logica.Gestion_de_Logica
                     encontrado.IdUsuario, encontrado.Nombre, encontrado.Apellido, encontrado.Correo,
                     encontrado.Usuario, encontrado.Password, encontrado.Rol, encontrado.Estado,
                     encontrado.TelegramChatId, fotoBytes
-                );
+                )
+                {
+                    IdArea = encontrado.IdArea,
+                    NombreArea = encontrado.NombreArea
+                };
             }
             catch (LogicaExcepciones)
             {
@@ -162,6 +168,23 @@ namespace Logica.Gestion_de_Logica
             catch (Exception ex)
             {
                 throw new LogicaExcepciones("Error al cambiar la contraseña del usuario", ex);
+            }
+        }
+
+        /// <summary>Etapa 3: asigna (o quita, con null) el área de un usuario.</summary>
+        public void AsignarArea(int idUsuario, int? idArea)
+        {
+            try
+            {
+                if (idArea.HasValue && !AreaCD.ListarAreas().Any(a => a.IdArea == idArea.Value))
+                    throw new LogicaExcepciones("El área seleccionada no existe.", null);
+                UsuarioCD.AsignarArea(idUsuario, idArea);
+            }
+            catch (LogicaExcepciones) { throw; }
+            catch (DatosExcepciones dex) { throw new LogicaExcepciones(dex.Message, dex); }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al asignar el área del usuario", ex);
             }
         }
 

@@ -1,30 +1,21 @@
 ﻿const ExcelJS = require('exceljs');
-const PdfPrinter = require('pdfmake');
+// pdfmake 0.3 cambió su API: ya no exporta PdfPrinter. Se usa pdfmake.createPdf(...).getBuffer()
+// con las fuentes estándar de PDF (Helvetica), que no necesitan archivos de fuente.
+const pdfmake = require('pdfmake');
+pdfmake.setFonts({
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique'
+  }
+});
+// Solo las fuentes estándar: no se permite leer otros archivos locales ni URLs
+pdfmake.setUrlAccessPolicy(() => false);
+const FUENTES_ESTANDAR = new Set(['Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique', 'Helvetica-BoldOblique']);
+pdfmake.setLocalAccessPolicy((ruta) => FUENTES_ESTANDAR.has(ruta));
 
-function createPdfPrinter() {
-  const fonts = {
-    Roboto: {
-      normal: 'node_modules/pdfmake/build/vfs_fonts.js', // We will use standard fonts
-      bold: 'node_modules/pdfmake/build/vfs_fonts.js',
-      italics: 'node_modules/pdfmake/build/vfs_fonts.js',
-      bolditalics: 'node_modules/pdfmake/build/vfs_fonts.js'
-    }
-  };
-  // PDFMake requires a physical font file by default, but we can use the Helvetica defaults
-  return new PdfPrinter({
-    Helvetica: {
-      normal: 'Helvetica',
-      bold: 'Helvetica-Bold',
-      italics: 'Helvetica-Oblique',
-      bolditalics: 'Helvetica-BoldOblique'
-    }
-  });
-}
-
-const generarPdfIncidencias = (incidencias) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const printer = createPdfPrinter();
+const generarPdfIncidencias = async (incidencias) => {
       
       const docDefinition = {
         defaultStyle: { font: 'Helvetica', fontSize: 10 },
@@ -40,7 +31,7 @@ const generarPdfIncidencias = (incidencias) => {
                     color: 'white',
                     border: [false, false, false, false],
                     stack: [
-                      { text: 'Sistema de Gestin de Incidencias APPB', bold: true, fontSize: 11, margin: [0, 0, 0, 5] },
+                      { text: 'Sistema de Gestión de Incidencias APPB', bold: true, fontSize: 11, margin: [0, 0, 0, 5] },
                       { text: 'Reporte General de Incidencias', bold: true, fontSize: 20 },
                       { text: 'Generado el ' + new Date().toLocaleString('es-EC'), color: '#a0aec0', fontSize: 9, margin: [0, 5, 0, 0] }
                     ],
@@ -58,15 +49,15 @@ const generarPdfIncidencias = (incidencias) => {
               widths: ['auto', 'auto', '*', '*', 'auto', '*', 'auto', 'auto', '*', 'auto'],
               body: [
                 [
-                  { text: 'N', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
+                  { text: 'N.º', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Fecha', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Empleado', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
-                  { text: 'rea', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
+                  { text: 'Área', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Tipo', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
-                  { text: 'Descripcin', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
+                  { text: 'Descripción', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Prioridad', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Estado', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
-                  { text: 'Tcnico', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
+                  { text: 'Técnico', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] },
                   { text: 'Cierre', bold: true, fillColor: '#f7fafc', border: [false, false, false, true] }
                 ],
                 ...incidencias.map((inc, i) => {
@@ -95,16 +86,7 @@ const generarPdfIncidencias = (incidencias) => {
         pageMargins: [0, 0, 0, 40]
       };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', err => reject(err));
-      pdfDoc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
+      return await pdfmake.createPdf(docDefinition).getBuffer();
 };
 
 const generarExcelIncidencias = async (incidencias) => {
@@ -112,8 +94,8 @@ const generarExcelIncidencias = async (incidencias) => {
   const sheet = workbook.addWorksheet('Incidencias');
 
   const encabezados = [
-    "Ticket", "Fecha", "Empleado", "rea", "Tipo", "Descripcin",
-    "Prioridad", "Estado", "Tcnico Asignado", "Fecha Solucin", "Observaciones"
+    "Ticket", "Fecha", "Empleado", "Área", "Tipo", "Descripción",
+    "Prioridad", "Estado", "Técnico Asignado", "Fecha Solución", "Observaciones"
   ];
 
   sheet.addRow(encabezados);

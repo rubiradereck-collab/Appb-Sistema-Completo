@@ -30,6 +30,8 @@ namespace Datos.Base_de_Datos
         public string Titulo { get; set; }
         public string Problema { get; set; }
         public string Solucion { get; set; }
+        public int? IdTipoIncidencia { get; set; }
+        public string NombreTipo { get; set; }
     }
 
     public class sp_Auditoria_ListarResult
@@ -67,6 +69,8 @@ namespace Datos.Base_de_Datos
         public int? IdUsuarioReporta { get; set; }
         public DateTime? FechaAsignacion { get; set; }
         public DateTime? FechaPrimeraRespuesta { get; set; }
+        public int? Calificacion { get; set; }
+        public DateTime? FechaCalificacion { get; set; }
     }
 
     public class sp_TiposIncidencia_ListarResult
@@ -91,6 +95,8 @@ namespace Datos.Base_de_Datos
         public int IntentosFallidos { get; set; }
         public DateTime? BloqueadoHasta { get; set; }
         public byte[] FotoPerfil { get; set; }
+        public int? IdArea { get; set; }
+        public string NombreArea { get; set; }
     }
 
     // sp_usuarios_login devuelve las mismas columnas que sp_usuarios_listar

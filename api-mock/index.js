@@ -154,54 +154,79 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
+// ===== Etapa 4: autenticación con las mismas reglas que el escritorio =====
+// - Bloqueo: 5 intentos fallidos => 5 minutos (lo calcula sp_usuarios_registrarintentofallido).
+// - Recuperación: la clave temporal se guarda aparte y vence en 30 minutos; la contraseña
+//   actual sigue funcionando. Entre solicitudes de la misma cuenta deben pasar 5 minutos,
+//   y cada IP puede pedir como máximo 5 recuperaciones cada 15 minutos.
+const crypto = require('crypto');
+const CARACTERES_CLAVE = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+const generarClaveTemporal = (largo = 10) => Array.from({ length: largo }, () => CARACTERES_CLAVE[crypto.randomInt(CARACTERES_CLAVE.length)]).join('');
+const CAMPOS_PRIVADOS = ['Password', 'passwordtemporal', 'passwordtemporalexpira', 'passwordtemporalsolicitada'];
+const sinCamposPrivados = (u) => { const c = { ...u }; CAMPOS_PRIVADOS.forEach(k => delete c[k]); return c; };
+
+const solicitudesPorIp = new Map();
+function limitarPorIp(ip, maximo = 5, ventanaMs = 15 * 60 * 1000) {
+  const ahora = Date.now();
+  const lista = (solicitudesPorIp.get(ip) || []).filter(t => ahora - t < ventanaMs);
+  if (lista.length >= maximo) { solicitudesPorIp.set(ip, lista); return false; }
+  lista.push(ahora);
+  solicitudesPorIp.set(ip, lista);
+  return true;
+}
+
 app.post('/api/auth/recuperar-password', async (req, res) => {
+    const respuestaGenerica = { message: 'Si el correo pertenece a una cuenta activa, se envió una contraseña temporal. Vence en 30 minutos y tu contraseña actual sigue funcionando.' };
     try {
-      const { Correo } = req.body;
+      const Correo = String(req.body.Correo || '').trim();
       if (!Correo) return res.status(400).json({ message: 'Correo requerido' });
-      
+      if (!limitarPorIp(req.ip)) return res.status(429).json({ message: 'Demasiadas solicitudes. Intenta de nuevo en unos minutos.' });
+
       const transporter = getTransporter();
       if (!transporter) return res.status(503).json({ message: 'Servicio de correo no configurado' });
 
       const pool = await getDb();
       const userRes = await pool.request()
         .input('Correo', sql.VarChar, Correo)
-        .query('SELECT * FROM Usuarios WHERE Correo = @Correo AND Estado = TRUE');
-  
-      if (userRes.recordset.length === 0) {
-        return res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
-      }
-  
+        .query('SELECT IdUsuario, Nombre, Correo FROM Usuarios WHERE Correo = @Correo::citext AND Estado = TRUE');
+      // Misma respuesta exista o no la cuenta (no revela qué correos están registrados)
+      if (userRes.recordset.length === 0) return res.status(200).json(respuestaGenerica);
+
       const usuario = userRes.recordset[0];
-      const nuevaClave = Math.random().toString(36).slice(-8); 
+      const nuevaClave = generarClaveTemporal();
       const hash = await bcrypt.hash(nuevaClave, 10);
-      
-      // SEND EMAIL FIRST
+
+      const r = await pool.request()
+        .input('Id', sql.Int, usuario.IdUsuario)
+        .input('Hash', sql.VarChar, hash)
+        .query('SELECT sp_usuarios_solicitartemporal(@Id, @Hash, 30, 5) AS Resultado');
+      if ((r.recordset[0].Resultado ?? r.recordset[0].resultado) !== 1) {
+        // Ya se pidió una hace menos de 5 minutos: no se envía otra
+        return res.status(200).json(respuestaGenerica);
+      }
+
       try {
         await transporter.sendMail({
           from: `"APPB Soporte" <${process.env.SMTP_USER}>`,
-          to: Correo,
+          to: usuario.Correo,
           subject: 'Recuperación de Contraseña - APPB',
           html: `
-            <h3>Hola, ${usuario.Nombre}</h3>
-            <p>Has solicitado restablecer tu contraseña.</p>
-            <p>Tu nueva contraseña temporal es: <strong>${nuevaClave}</strong></p>
-            <p>Te recomendamos cambiarla inmediatamente después de iniciar sesión en el apartado de Perfil.</p>
+            <h3>Hola, ${escaparHtml(usuario.Nombre)}</h3>
+            <p>Se solicitó recuperar el acceso a tu cuenta.</p>
+            <p>Tu contraseña temporal es: <strong>${nuevaClave}</strong></p>
+            <p>Vence en 30 minutos. Tu contraseña actual sigue funcionando; si entras con la temporal,
+               esa pasa a ser tu contraseña y te recomendamos cambiarla en tu Perfil.</p>
+            <p>Si no lo solicitaste, ignora este correo.</p>
             <br/>
             <p>Atentamente,<br/>Equipo de Soporte APPB</p>
           `
         });
       } catch (mailErr) {
         console.error("Error enviando correo de recuperacion:", mailErr.message);
-        return res.status(500).json({ message: "No se pudo enviar el correo con la nueva contraseña. No se han guardado cambios." });
+        return res.status(500).json({ message: "No se pudo enviar el correo. Intenta más tarde." });
       }
-  
-      // UPDATE ONLY IF MAIL SUCCEEDED
-      await pool.request()
-        .input('Id', sql.Int, usuario.IdUsuario)
-        .input('Hash', sql.VarChar, hash)
-        .query('UPDATE Usuarios SET Password = @Hash, IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @Id');
-  
-      res.status(200).json({ message: 'Si el correo existe, se han enviado las instrucciones.' });
+
+      res.status(200).json(respuestaGenerica);
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: 'Error interno del servidor' });
@@ -211,40 +236,42 @@ app.post('/api/auth/recuperar-password', async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   try {
+    if (!username || !password) return res.status(400).json({ success: false, message: "Ingresa usuario y contraseña" });
     const pool = await getDb();
     const result = await pool.request()
-      .input("Usuario", sql.VarChar, username)
-      .query("SELECT * FROM Usuarios WHERE Usuario = @Usuario");
+      .input("Usuario", sql.VarChar, String(username).trim())
+      .query("SELECT * FROM Usuarios WHERE Usuario = @Usuario::citext");
       
     const user = result.recordset[0];
-    if (!user) {
-      return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
-    }
-    if (user.Estado === false) {
-      return res.status(401).json({ success: false, message: "Usuario inactivo" });
+    if (!user || user.Estado === false) {
+      return res.status(401).json({ success: false, message: "Credenciales incorrectas o usuario inactivo" });
     }
     
     if (user.BloqueadoHasta && new Date(user.BloqueadoHasta) > new Date()) {
       const faltan = Math.ceil((new Date(user.BloqueadoHasta) - new Date()) / 60000);
-        return res.status(401).json({ success: false, message: "Cuenta bloqueada. Intenta de nuevo en " + faltan + " minuto(s)." });
+      return res.status(401).json({ success: false, message: "Cuenta bloqueada temporalmente por intentos fallidos. Intenta de nuevo en " + faltan + " minuto(s)." });
     }
 
-    const match = await bcrypt.compare(password, user.Password);
+    let match = await bcrypt.compare(password, user.Password);
+    let conTemporal = false;
     if (!match) {
-      const intentos = (user.IntentosFallidos || 0) + 1;
-      // 3 intentos fallidos => bloqueo de 15 minutos (la hora la calcula PostgreSQL)
-      await pool.request()
-        .input("IdUsuario", sql.Int, user.IdUsuario)
-        .input("IntentosFallidos", sql.Int, intentos)
-        .input("Bloquear", sql.Bit, intentos >= 3)
-        .query("UPDATE Usuarios SET IntentosFallidos = @IntentosFallidos, BloqueadoHasta = CASE WHEN @Bloquear THEN LOCALTIMESTAMP + INTERVAL '15 minutes' ELSE NULL END WHERE IdUsuario = @IdUsuario");
-        
-      return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
+      // Clave temporal de recuperación vigente
+      const t = await pool.request().input("Id", sql.Int, user.IdUsuario).query("SELECT passwordtemporal FROM sp_usuarios_obtenertemporal(@Id)");
+      const hashTemporal = t.recordset[0]?.passwordtemporal;
+      if (hashTemporal && await bcrypt.compare(password, hashTemporal)) {
+        const u = await pool.request().input("Id", sql.Int, user.IdUsuario).query("SELECT sp_usuarios_usartemporal(@Id) AS Resultado");
+        match = (u.recordset[0].Resultado ?? u.recordset[0].resultado) === 1;
+        conTemporal = match;
+      }
     }
 
-    await pool.request()
-      .input("IdUsuario", sql.Int, user.IdUsuario)
-      .query("UPDATE Usuarios SET IntentosFallidos = 0, BloqueadoHasta = NULL WHERE IdUsuario = @IdUsuario");
+    if (!match) {
+      // Misma regla que el escritorio: 5 intentos => 5 minutos de bloqueo
+      await pool.request().input("Id", sql.Int, user.IdUsuario).query("SELECT sp_usuarios_registrarintentofallido(@Id)");
+      return res.status(401).json({ success: false, message: "Credenciales incorrectas o usuario inactivo" });
+    }
+
+    await pool.request().input("Id", sql.Int, user.IdUsuario).query("SELECT sp_usuarios_resetearintentos(@Id)");
       
     const token = jwt.sign(
       { IdUsuario: user.IdUsuario, Rol: user.Rol },
@@ -252,12 +279,14 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: "8h" }
     );
 
-    const userSafe = { ...user };
-    delete userSafe.Password;
+    const userSafe = sinCamposPrivados(user);
     if (userSafe.FotoPerfil && Buffer.isBuffer(userSafe.FotoPerfil)) {
       userSafe.FotoPerfil = `data:image/jpeg;base64,${userSafe.FotoPerfil.toString('base64')}`;
     }
-    res.json({ success: true, token, user: userSafe });
+    res.json({
+      success: true, token, user: userSafe, conTemporal,
+      aviso: conTemporal ? "Ingresaste con la contraseña temporal, que ahora es tu contraseña. Cámbiala en tu Perfil." : undefined
+    });
   } catch(err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Error interno" });
@@ -311,6 +340,24 @@ app.post('/api/interno/notificar', async (req, res) => {
 });
 
 app.use(verifyToken);
+
+// Etapa 4: nombre del Bot de Telegram para el botón del perfil (se pregunta una vez a Telegram)
+let nombreBotTelegram = null;
+app.get("/api/telegram/bot", async (req, res) => {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(404).json({ message: "El Bot de Telegram no está configurado." });
+    if (!nombreBotTelegram) {
+      const r = await axios.get(`https://api.telegram.org/bot${token}/getMe`, { timeout: 8000 });
+      nombreBotTelegram = r.data?.result?.username || null;
+    }
+    if (!nombreBotTelegram) return res.status(404).json({ message: "No se pudo obtener el nombre del Bot." });
+    res.json({ username: nombreBotTelegram });
+  } catch (err) {
+    console.error("Error consultando el Bot de Telegram:", err.message);
+    res.status(502).json({ message: "No se pudo consultar el Bot de Telegram." });
+  }
+});
 
 // Error 500 sin exponer detalles internos (SQL, rutas) al cliente
 const responderError = (res, err) => {
@@ -893,7 +940,7 @@ app.post("/api/usuarios/:id/reset-password", requireAdmin, async (req, res) => {
         .query('SELECT Correo FROM Usuarios WHERE IdUsuario = @Id');
       
       const userEmail = userRes.recordset[0]?.Correo;
-      const nuevaPassword = Math.random().toString(36).slice(-8);
+      const nuevaPassword = generarClaveTemporal();
       const hash = await require('bcryptjs').hash(nuevaPassword, 10);
       
       const transporter = getTransporter();
@@ -1029,9 +1076,9 @@ app.get("/api/perfil", verifyToken, async (req, res) => {
     const result = await pool.request()
       .input("IdUsuario", sql.Int, req.user.IdUsuario)
       .query("SELECT * FROM Usuarios WHERE IdUsuario = @IdUsuario");
-    const user = result.recordset[0];
+    let user = result.recordset[0];
     if (user) {
-      delete user.Password;
+      user = sinCamposPrivados(user);
       if (user.FotoPerfil) {
         user.FotoPerfil = `data:image/jpeg;base64,${user.FotoPerfil.toString("base64")}`;
       }
@@ -1102,8 +1149,13 @@ app.post("/api/perfil/foto", async (req, res) => {
   try {
     const pool = await getDb();
     // Convert data URL to raw bytes for PostgreSQL (bytea)
+    if (typeof req.body.FotoPerfil !== "string" || !/^data:image\/(png|jpe?g|gif|bmp|webp);base64,/i.test(req.body.FotoPerfil)) {
+      return res.status(400).json({ message: "La foto debe ser una imagen (PNG, JPG, GIF, BMP o WEBP)." });
+    }
     const base64Data = req.body.FotoPerfil.replace(/^data:image\/\w+;base64,/, "");
     const imageBuffer = Buffer.from(base64Data, 'base64');
+    // Etapa 4: mismo límite que el escritorio
+    if (imageBuffer.length > 2 * 1024 * 1024) return res.status(400).json({ message: "La imagen no puede superar los 2 MB." });
     
     await pool.request()
       .input("FotoPerfil", sql.VarBinary, imageBuffer)
@@ -1306,6 +1358,14 @@ app.put("/api/incidencias/:id", async (req, res) => {
     if (!esAdmin && cambiaTecnico && !esAutoAsignacion) {
       return res.status(403).json({ message: "Solo un administrador puede asignar o reasignar incidencias" });
     }
+    // Etapa 4: "Aceptar" solo para tickets abiertos (no reabre uno resuelto, cerrado o anulado)
+    if (esAutoAsignacion && !esAdmin) {
+      const est = await pool.request().input("Id", sql.Int, actual.IdEstado).query("SELECT Nombre FROM Estados WHERE IdEstado = @Id");
+      const nombreActual = est.recordset[0]?.Nombre;
+      if (["Resuelto", "Cerrado", "Anulado"].includes(nombreActual)) {
+        return res.status(409).json({ message: `Este ticket ya está ${nombreActual}.` });
+      }
+    }
 
     // Solo técnicos activos
     if (cambiaTecnico && IdTecnicoAsignado !== null) {
@@ -1362,10 +1422,23 @@ app.put("/api/incidencias/:id", async (req, res) => {
 
     if (setClauses.length > 0) {
       // Al "Aceptar", solo si nadie lo tomó en el mismo instante
-      const condicion = esAutoAsignacion ? " AND IdTecnicoAsignado IS NULL" : "";
+      let condicion = esAutoAsignacion ? " AND IdTecnicoAsignado IS NULL" : "";
+      // Etapa 4: control de concurrencia igual que el escritorio. Si la app envía la FilaVersion
+      // que leyó, el cambio solo se guarda si nadie modificó el ticket mientras tanto.
+      const filaVersion = req.body.FilaVersion;
+      if (filaVersion !== undefined && filaVersion !== null && filaVersion !== "") {
+        if (!/^\d+$/.test(String(filaVersion))) return res.status(400).json({ message: "FilaVersion inválida." });
+        request.input("FilaVersion", sql.BigInt, String(filaVersion));
+        condicion += " AND FilaVersion = @FilaVersion::bigint";
+      }
       const upd = await request.query(`UPDATE Incidencias SET ${setClauses.join(", ")} WHERE IdIncidencia = @IdIncidencia${condicion}`);
       if (upd.rowsAffected[0] === 0) {
-        return res.status(409).json({ message: "Otro técnico tomó este ticket hace un momento." });
+        return res.status(409).json({
+          message: esAutoAsignacion
+            ? "Otro técnico tomó este ticket hace un momento."
+            : "Otra persona modificó esta incidencia mientras la tenías abierta. Se recargarán los datos.",
+          conflicto: true
+        });
       }
       const accion = cambiaTecnico ? "Asignar" : "Editar";
       await registrarAuditoria(pool, req, accion, id, accionesAuditoria.join(". "));
@@ -1398,12 +1471,29 @@ app.post("/api/incidencias/:id/calificacion", async (req, res) => {
   } catch (err) { responderError(res, err); }
 });
 
+// Etapa 4: "eliminar" anula el ticket (queda en el historial y en los informes).
+// El borrado definitivo se pide de forma explícita con ?definitivo=true.
 app.delete("/api/incidencias/:id", requireAdmin, async (req, res) => {
   try {
+    const id = aEntero(req.params.id);
+    if (!id) return res.status(400).json({ message: "Id inválido." });
     const pool = await getDb();
-    await pool.request().input("IdIncidencia", sql.Int, req.params.id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
-    await registrarAuditoria(pool, req, "Eliminar", req.params.id, "Eliminó el ticket permanentemente");
-    res.json({ success: true });
+    const actual = (await pool.request().input("Id", sql.Int, id).query("SELECT NumeroTicket FROM Incidencias WHERE IdIncidencia = @Id")).recordset[0];
+    if (!actual) return res.status(404).json({ message: "No encontrada" });
+
+    if (req.query.definitivo === "true" || req.query.definitivo === "1") {
+      await pool.request().input("IdIncidencia", sql.Int, id).query("DELETE FROM Incidencias WHERE IdIncidencia = @IdIncidencia");
+      await registrarAuditoria(pool, req, "Eliminar", id, `Ticket borrado definitivamente: ${actual.NumeroTicket}`);
+      return res.json({ success: true, anulada: false });
+    }
+
+    const motivo = String(req.body?.motivo || req.query.motivo || "").trim() || "Anulado desde la app";
+    const r = await pool.request().input("Id", sql.Int, id).input("Motivo", sql.Text, motivo.slice(0, 500))
+      .query("SELECT sp_incidencias_anular(@Id, @Motivo) AS Resultado");
+    if ((r.recordset[0].Resultado ?? r.recordset[0].resultado) !== 1) return res.status(409).json({ message: "La incidencia ya estaba anulada." });
+    await registrarAuditoria(pool, req, "Anular", id, `Ticket: ${actual.NumeroTicket} | Motivo: ${motivo}`);
+    notificarActualizacionIncidencia(pool, id, 'estado', null, null, req.user.IdUsuario);
+    res.json({ success: true, anulada: true });
   } catch(err) { responderError(res, err); }
 });
 

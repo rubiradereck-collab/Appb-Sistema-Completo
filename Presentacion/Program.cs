@@ -10,6 +10,23 @@ namespace Presentacion
 {
     internal static class Program
     {
+        private static void MostrarErrorNoPrevisto(Exception ex, bool cerrando)
+        {
+            try
+            {
+                string ruta = ex != null ? FrmLogin.GuardarErrorEnLog(ex) : null;
+                string mensaje = "Ocurrió un error inesperado." +
+                    (cerrando ? " La aplicación se cerrará." : " Puedes seguir trabajando; si se repite, reinicia la aplicación.") +
+                    (ex != null ? "\n\n" + ex.Message : "") +
+                    (ruta != null ? "\n\nDetalle guardado en:\n" + ruta : "");
+                MessageBox.Show(mensaje, "Error inesperado", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch
+            {
+                // Si ni siquiera se puede mostrar el mensaje, no hacer nada más
+            }
+        }
+
         // Creamos una llave única para tu aplicación
         static Mutex mutex = new Mutex(true, "{APPB-Sistema-Incidencias-2027}");
 
@@ -26,6 +43,12 @@ namespace Presentacion
                 {
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
+
+                    // Etapa 4: un error no previsto ya no cierra la aplicación sin aviso.
+                    // Se muestra un mensaje y el detalle queda en %LOCALAPPDATA%\APPB\errores.log
+                    Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                    Application.ThreadException += (s, e) => MostrarErrorNoPrevisto(e.Exception, cerrando: false);
+                    AppDomain.CurrentDomain.UnhandledException += (s, e) => MostrarErrorNoPrevisto(e.ExceptionObject as Exception, cerrando: e.IsTerminating);
 
                     // Forzar a WinForms a usar seguridad TLS 1.2 (Requisito indispensable para que el Bot no falle)
                     System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;

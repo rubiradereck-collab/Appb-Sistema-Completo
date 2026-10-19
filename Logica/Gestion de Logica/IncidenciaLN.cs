@@ -126,6 +126,9 @@ namespace Logica.Gestion_de_Logica
                     bool seLaAsigna = actual.IdTecnicoAsignado == null && oe.IdTecnicoAsignado == actor.IdUsuario;
                     if (!seLaAsigna)
                         throw new LogicaExcepciones("Solo un administrador puede asignar o reasignar incidencias a otro técnico.", null);
+                    // Etapa 4: tomar un ticket solo si sigue abierto (igual que en la API y en Telegram)
+                    if (actual.NombreEstado == ESTADO_RESUELTO || actual.NombreEstado == ESTADO_CERRADO || actual.NombreEstado == ESTADO_ANULADO)
+                        throw new LogicaExcepciones($"Este ticket ya está {actual.NombreEstado}. Solo un administrador puede reabrirlo.", null);
                 }
                 if (cambiaEstado)
                 {
@@ -179,6 +182,27 @@ namespace Logica.Gestion_de_Logica
             }
         }
 
+        /// <summary>
+        /// Etapa 4: "Eliminar" anula la incidencia (queda en el historial y en los informes).
+        /// Solo el administrador. Devuelve false si ya estaba anulada.
+        /// </summary>
+        public bool AnularIncidencia(Incidencia oe, Usuario actor, string motivo)
+        {
+            if (actor == null || actor.Rol != ROL_ADMIN)
+                throw new LogicaExcepciones("Solo un administrador puede anular incidencias.", null);
+            if (string.IsNullOrWhiteSpace(motivo))
+                throw new LogicaExcepciones("Indica el motivo de la anulación.", null);
+            try
+            {
+                return IncidenciaCD.AnularIncidencia(oe.IdIncidencia, motivo.Trim());
+            }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al anular la incidencia", ex);
+            }
+        }
+
+        /// <summary>Borra la incidencia de la base de datos. Usar solo para registros de prueba o duplicados.</summary>
         public bool DeleteIncidencia(Incidencia oe)
         {
             try
@@ -336,6 +360,11 @@ namespace Logica.Gestion_de_Logica
                 {
                     return "❌ No estás registrado como técnico activo o tu cuenta no está vinculada.";
                 }
+
+                // Etapa 4: un botón "Aceptar" viejo no debe reabrir un ticket ya terminado o anulado
+                var actual = ShowIncidencia().FirstOrDefault(i => i.IdIncidencia == idIncidencia);
+                if (actual != null && (actual.NombreEstado == ESTADO_RESUELTO || actual.NombreEstado == ESTADO_CERRADO || actual.NombreEstado == ESTADO_ANULADO))
+                    return $"⚠️ Este ticket ya está {actual.NombreEstado}.";
 
                 int idEnProceso = ObtenerIdEstadoPorNombre(ESTADO_EN_PROCESO);
                 bool asignado = IncidenciaCD.AsignarTecnicoTelegram(idIncidencia, tecnico.IdUsuario, idEnProceso);

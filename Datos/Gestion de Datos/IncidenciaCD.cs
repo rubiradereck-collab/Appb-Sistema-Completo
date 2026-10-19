@@ -83,6 +83,16 @@ namespace Datos.Gestion_de_Datos
                 "Error al modificar en la tabla Incidencias");
         }
 
+        /// <summary>Etapa 4: pasa la incidencia a Anulado (no la borra). false = ya estaba anulada.</summary>
+        public static bool AnularIncidencia(int idIncidencia, string motivo)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_incidencias_anular(@id, @motivo)",
+                P("id", NpgsqlDbType.Integer, idIncidencia),
+                P("motivo", NpgsqlDbType.Text, motivo)) == 1,
+                "Error al anular la incidencia");
+        }
+
         public static void EliminarIncidencia(Entidades.Gestion_de_Entidades.Incidencia oe)
         {
             ManejoErrores.Intentar(() => Ejecutar(

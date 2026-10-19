@@ -7,15 +7,16 @@ const StatsWidget = ({ incidencias }) => {
   const data = useMemo(() => {
     if (!incidencias || incidencias.length === 0) return [];
     const counts = incidencias.reduce((acc, inc) => {
-      acc[inc.IdEstado] = (acc[inc.IdEstado] || 0) + 1;
+      // Etapa 4: por nombre del estado, no por Id (los Id dependen del orden de instalación)
+      acc[inc.NombreEstado] = (acc[inc.NombreEstado] || 0) + 1;
       return acc;
     }, {});
     
     return [
-      { name: 'Pendientes', value: counts[1] || 0 },
-      { name: 'En Proceso', value: counts[2] || 0 },
-      { name: 'Resueltas', value: counts[3] || 0 },
-      { name: 'Cerradas', value: counts[4] || 0 }
+      { name: 'Pendientes', value: counts['Pendiente'] || 0 },
+      { name: 'En Proceso', value: counts['En Proceso'] || 0 },
+      { name: 'Resueltas', value: counts['Resuelto'] || 0 },
+      { name: 'Cerradas', value: counts['Cerrado'] || 0 }
     ].filter(d => d.value > 0);
   }, [incidencias]);
 

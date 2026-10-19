@@ -390,6 +390,29 @@ namespace Bot
             }
         }
 
+        // Etapa 4: respuesta a /start y /ayuda
+        static string TextoAyuda(Usuario usuario)
+        {
+            string saludo = usuario != null
+                ? $"👋 Hola, {usuario.Nombre}. Tu cuenta ya está vinculada.\n\n"
+                : "👋 Bienvenido al Bot de Incidencias de la Unidad de Tecnología (APPB).\n\n" +
+                  "Primero vincula tu cuenta del sistema:\n/registrar usuario contraseña\n" +
+                  "(el mensaje con tu contraseña se borra automáticamente)\n\n";
+
+            string comandos =
+                "Comandos:\n" +
+                "/reportar — reportar una incidencia paso a paso\n" +
+                "/estado — ver tu última incidencia\n" +
+                "/estado Solicitud-00001 — ver una incidencia por su número\n" +
+                "/cancelar — cancelar un reporte en curso\n" +
+                "/ayuda — ver este mensaje";
+
+            if (usuario != null && usuario.Rol == "Técnico")
+                comandos += "\n\nComo técnico, recibirás aquí los tickets nuevos con el botón \"Aceptar Ticket\".";
+
+            return saludo + comandos;
+        }
+
         static string EmojiTipo(string nombre)
         {
             switch ((nombre ?? "").Trim().ToLowerInvariant())
@@ -488,8 +511,13 @@ namespace Bot
                 case "/estado":
                     await ManejarEstado(chatId, partes);
                     break;
+                case "/start":
+                case "/ayuda":
+                case "/help":
+                    await botClient.SendMessage(chatId, TextoAyuda(new UsuarioLN().BuscarPorChatId(chatId)));
+                    break;
                 default:
-                    await botClient.SendMessage(chatId, "Comando no reconocido. Usa /registrar, /reportar o /estado.");
+                    await botClient.SendMessage(chatId, "Comando no reconocido. Escribe /ayuda para ver lo que puedo hacer.");
                     break;
             }
         }
@@ -559,7 +587,8 @@ namespace Bot
                 else
                 {
                     await botClient.AnswerCallbackQuery(callbackQuery.Id, resultado, showAlert: true);
-                    await botClient.EditMessageText(chatId: chatId, messageId: callbackQuery.Message.MessageId, text: callbackQuery.Message.Text + "\n\n🔒 *(Ticket tomado por otro técnico)*");
+                    string nota = resultado.StartsWith("⚠️ Este ticket ya está") ? resultado : "🔒 (Ticket tomado por otro técnico)";
+                    await botClient.EditMessageText(chatId: chatId, messageId: callbackQuery.Message.MessageId, text: callbackQuery.Message.Text + "\n\n" + nota);
                 }
                 return;
             }

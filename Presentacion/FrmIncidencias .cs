@@ -48,7 +48,9 @@ namespace Presentacion
             TemaModerno.Aplicar(this);
             toolTip1.SetToolTip(btnNuevo, "Limpiar el formulario para crear una nueva incidencia");
             toolTip1.SetToolTip(btnGuardar, "Guardar los cambios de la incidencia");
-            toolTip1.SetToolTip(btnEliminar, "Eliminar la incidencia seleccionada permanentemente");
+            // Etapa 4: "Eliminar" anula la incidencia; el borrado definitivo se pide aparte
+            btnEliminar.Text = "🚫 Anular";
+            toolTip1.SetToolTip(btnEliminar, "Anular la incidencia seleccionada (queda en el historial). Solo administradores.");
             toolTip1.SetToolTip(btnExportarPdf, "Exportar el listado actual a PDF");
             toolTip1.SetToolTip(btnExportarExcel, "Exportar el listado actual a Excel");
             toolTip1.SetToolTip(btnFiltros, "Filtrar por estado o rango de fechas");
@@ -488,11 +490,55 @@ namespace Presentacion
                 return;
             }
 
-            DialogResult confirmacion = MessageBox.Show(
-                $"¿Eliminar la incidencia {incidenciaSeleccionada.NumeroTicket}?",
-                "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult opcion = MessageBox.Show(
+                $"¿Qué deseas hacer con la incidencia {incidenciaSeleccionada.NumeroTicket}?\n\n" +
+                "Sí  →  Anularla (recomendado). Queda en el historial y en los informes con estado Anulado.\n" +
+                "No  →  Borrarla definitivamente. Úsalo solo para registros de prueba o duplicados.\n" +
+                "Cancelar  →  No hacer nada.",
+                "Anular incidencia", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
 
-            if (confirmacion != DialogResult.Yes) return;
+            if (opcion == DialogResult.Cancel) return;
+
+            if (opcion == DialogResult.Yes)
+            {
+                string motivo = Microsoft.VisualBasic.Interaction.InputBox(
+                    "Motivo de la anulación (por ejemplo: duplicado, reportado por error):",
+                    "Anular " + incidenciaSeleccionada.NumeroTicket, "");
+                if (string.IsNullOrWhiteSpace(motivo)) return;
+
+                try
+                {
+                    Incidencia anulada = incidenciaSeleccionada;
+                    if (!incidenciaLN.AnularIncidencia(anulada, usuarioActual, motivo))
+                    {
+                        MessageBox.Show("La incidencia ya estaba anulada.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    auditoriaLN.Registrar(
+                        usuarioActual.IdUsuario,
+                        $"{usuarioActual.Nombre} {usuarioActual.Apellido}",
+                        "Anular",
+                        "Incidencia",
+                        anulada.IdIncidencia,
+                        $"Ticket: {anulada.NumeroTicket} | Motivo: {motivo.Trim()}"
+                    );
+                    _ = NotificarA_NodeAPI("estado", anulada, "Anulado");
+
+                    CargarGrid();
+                    LimpiarFormulario();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+
+            if (MessageBox.Show(
+                    $"La incidencia {incidenciaSeleccionada.NumeroTicket} se borrará de la base de datos y no se podrá recuperar.\n\n¿Continuar?",
+                    "Borrar definitivamente", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
 
             try
             {

@@ -94,6 +94,38 @@ namespace Datos.Gestion_de_Datos
                 "Error al asignar el área del usuario");
         }
 
+        // ---- Etapa 4: contraseña temporal de recuperación (guardada aparte, con vencimiento) ----
+
+        /// <summary>true = guardada; false = ya se pidió una hace muy poco.</summary>
+        public static bool SolicitarTemporal(int idUsuario, string hash, int validezMinutos, int esperaMinutos)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_usuarios_solicitartemporal(@id, @hash, @validez, @espera)",
+                P("id", NpgsqlDbType.Integer, idUsuario),
+                P("hash", NpgsqlDbType.Varchar, hash),
+                P("validez", NpgsqlDbType.Integer, validezMinutos),
+                P("espera", NpgsqlDbType.Integer, esperaMinutos)) == 1,
+                "Error al guardar la contraseña temporal");
+        }
+
+        /// <summary>Hash de la clave temporal vigente, o null.</summary>
+        public static string ObtenerTemporal(int idUsuario)
+        {
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT passwordtemporal FROM sp_usuarios_obtenertemporal(@id)",
+                dr => Texto(dr, "passwordtemporal"),
+                P("id", NpgsqlDbType.Integer, idUsuario)).FirstOrDefault(),
+                "Error al leer la contraseña temporal");
+        }
+
+        public static bool UsarTemporal(int idUsuario)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_usuarios_usartemporal(@id)",
+                P("id", NpgsqlDbType.Integer, idUsuario)) == 1,
+                "Error al activar la contraseña temporal");
+        }
+
         public static void EliminarUsuario(Entidades.Gestion_de_Entidades.Usuario oc)
         {
             ManejoErrores.Intentar(() => Ejecutar(

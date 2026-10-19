@@ -44,7 +44,7 @@ namespace Presentacion
             cboRangoFecha.Items.Clear();
             cboRangoFecha.Items.AddRange(new object[]
             {
-                "Todo el histórico", "Hoy", "Últimos 7 días", "Últimos 30 días", "Este mes", "Personalizado"
+                "Todo el histórico", "Hoy", "Últimos 7 días", "Últimos 30 días", "Este mes", "Mes anterior", "Personalizado"
             });
             cboRangoFecha.SelectedIndex = 0;
             cboRangoFecha.SelectedIndexChanged += CboRangoFecha_SelectedIndexChanged;
@@ -227,6 +227,10 @@ namespace Presentacion
                     filtro.FechaDesde = new DateTime(hoy.Year, hoy.Month, 1);
                     filtro.FechaHasta = hoy;
                     break;
+                case "Mes anterior":
+                    filtro.FechaDesde = new DateTime(hoy.Year, hoy.Month, 1).AddMonths(-1);
+                    filtro.FechaHasta = new DateTime(hoy.Year, hoy.Month, 1).AddDays(-1);
+                    break;
                 case "Personalizado":
                     filtro.FechaDesde = dtpDesde.Value.Date;
                     filtro.FechaHasta = dtpHasta.Value.Date;
@@ -267,8 +271,10 @@ namespace Presentacion
                 metricas.PorEstado.TryGetValue("Pendiente", out int totalPendientes);
                 lblPendientesValor.Text = totalPendientes.ToString();
 
+                // Etapa 4: "Resueltos" suma también los cerrados (los dos son tickets atendidos)
                 metricas.PorEstado.TryGetValue("Resuelto", out int totalResueltas);
-                lblResueltosValor.Text = totalResueltas.ToString();
+                metricas.PorEstado.TryGetValue("Cerrado", out int totalCerradas);
+                lblResueltosValor.Text = (totalResueltas + totalCerradas).ToString();
 
                 lblTiempoPromedioValor.Text = metricas.TiempoPromedioResolucionHoras.HasValue
                     ? $"{metricas.TiempoPromedioResolucionHoras.Value:0.#}h"
@@ -366,6 +372,7 @@ namespace Presentacion
                 case "En Proceso": return Color.FromArgb(43, 107, 154);
                 case "Resuelto": return Color.FromArgb(39, 174, 96);
                 case "Cerrado": return Color.FromArgb(117, 117, 117);
+                case "Anulado": return Color.FromArgb(189, 195, 199);
                 default: return Color.FromArgb(21, 50, 80);
             }
         }

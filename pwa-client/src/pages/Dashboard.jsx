@@ -87,9 +87,10 @@ const Dashboard = () => {
 
   // Cálculos de tarjetas
   const total = incidencias.length;
-  const pendientes = incidencias.filter(i => i.IdEstado === 1).length;
-  const resueltos = incidencias.filter(i => i.IdEstado === 3).length;
-  const cerrados = incidencias.filter(i => i.IdEstado === 4).length;
+  // Etapa 4: por nombre del estado, no por Id
+  const pendientes = incidencias.filter(i => i.NombreEstado === 'Pendiente').length;
+  const resueltos = incidencias.filter(i => i.NombreEstado === 'Resuelto').length;
+  const cerrados = incidencias.filter(i => i.NombreEstado === 'Cerrado').length;
   
   // Tiempo promedio real de atención (desde la creación hasta la solución)
   const resueltasConFecha = incidencias.filter(i => i.FechaSolucion && i.Fecha);
@@ -103,7 +104,7 @@ const Dashboard = () => {
   const dataEstado = estados.map(est => ({
     name: est.NombreEstado,
     value: incidencias.filter(i => i.IdEstado === est.IdEstado).length,
-    color: est.IdEstado === 1 ? '#f59e0b' : est.IdEstado === 2 ? '#3b82f6' : est.IdEstado === 3 ? '#10b981' : '#6b7280'
+    color: ({ 'Pendiente': '#f59e0b', 'En Proceso': '#3b82f6', 'Resuelto': '#10b981', 'Cerrado': '#6b7280', 'Anulado': '#cbd5e1' })[est.NombreEstado] || '#6b7280'
   })).filter(d => d.value > 0);
 
   // Datos Gráfico Prioridad

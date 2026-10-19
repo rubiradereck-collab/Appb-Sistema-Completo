@@ -28,6 +28,10 @@ export const AuthProvider = ({ children }) => {
         setUser(res.data.user);
         localStorage.setItem('appb_user', JSON.stringify(res.data.user));
         localStorage.setItem('appb_token', res.data.token);
+        // Etapa 4: entró con la contraseña temporal de recuperación
+        if (res.data.aviso) {
+          setTimeout(() => window.dispatchEvent(new CustomEvent('app-success', { detail: res.data.aviso })), 500);
+        }
         return { success: true };
       }
       return { success: false, message: 'Credenciales incorrectas' };

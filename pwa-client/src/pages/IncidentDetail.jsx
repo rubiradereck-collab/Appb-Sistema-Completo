@@ -53,8 +53,10 @@ const IncidentDetail = () => {
     setGuardando(true);
     try {
       await api.put(`/incidencias/${id}`, {
-        IdEstado: nuevoEstado,
-        Observaciones: observaciones
+        IdEstado: Number(nuevoEstado),
+        Observaciones: observaciones,
+        // Etapa 4: si otra persona la cambió mientras tanto, la API responde 409
+        FilaVersion: incidencia.FilaVersion
       });
       
         if (Capacitor.isNativePlatform()) {
@@ -65,6 +67,7 @@ const IncidentDetail = () => {
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error al actualizar';
       window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
+      if (error.response?.data?.conflicto) fetchDetail();
     }
     setGuardando(false);
   };
@@ -81,7 +84,8 @@ const IncidentDetail = () => {
         try {
           await api.put(`/incidencias/${id}`, {
             IdTecnicoAsignado: user.IdUsuario,
-            IdEstado: 2 // En Proceso
+            // Etapa 4: el Id de "En Proceso" se busca por nombre
+            IdEstado: estados.find(e => e.NombreEstado === 'En Proceso')?.IdEstado ?? incidencia.IdEstado
           });
           
         if (Capacitor.isNativePlatform()) {
@@ -222,14 +226,17 @@ const IncidentDetail = () => {
                     onClick={() => {
                       setConfirmModal({
                         show: true,
-                        title: 'Eliminar Incidencia',
-                        message: '¿Estás seguro de que deseas ELIMINAR permanentemente esta incidencia? Esta acción no se puede deshacer.',
+                        title: 'Anular Incidencia',
+                        message: 'La incidencia pasará al estado Anulado: deja de atenderse, pero queda en el historial y en los informes.',
                         isDestructive: true,
                         onConfirm: async () => {
                           setConfirmModal({ show: false });
+                          // Etapa 4: se anula (el borrado definitivo solo existe en el escritorio)
+                          const motivo = window.prompt('Motivo de la anulación (por ejemplo: duplicado, reportado por error):', '');
+                          if (motivo === null || !motivo.trim()) return;
                           try {
-                            await api.delete(`/incidencias/${id}`);
-                            window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia eliminada exitosamente.'}));
+                            await api.delete(`/incidencias/${id}`, { data: { motivo: motivo.trim() } });
+                            window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia anulada.'}));
                             navigate('/incidencias');
                           } catch (error) {
                             const errorMsg = error.response?.data?.message || 'Error al eliminar incidencia.';
@@ -240,7 +247,7 @@ const IncidentDetail = () => {
                     }}
                     className="w-full mt-2 bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200 transition-colors"
                   >
-                    Eliminar Incidencia
+                    Anular Incidencia
                   </button>
                 )}
               </div>
@@ -278,11 +285,13 @@ const IncidentDetail = () => {
                 </div>
               )}
 
-              {incidencia.IdEstado >= 3 && (
+              {['Resuelto', 'Cerrado', 'Anulado'].includes(nombreEstado) && (
                 <div className="relative pl-6">
-                  <div className="absolute w-4 h-4 bg-[#10b981] rounded-full -left-[9px] top-1 border-2 border-white shadow-sm"></div>
-                  <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Estado actualizado a Resuelto</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">El técnico ha marcado el ticket como resuelto.</p>
+                  <div className={`absolute w-4 h-4 ${nombreEstado === 'Anulado' ? 'bg-gray-400' : 'bg-[#10b981]'} rounded-full -left-[9px] top-1 border-2 border-white shadow-sm`}></div>
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Estado actualizado a {nombreEstado}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {nombreEstado === 'Anulado' ? 'El ticket fue anulado y ya no se atenderá.' : `El técnico marcó el ticket como ${nombreEstado.toLowerCase()}.`}
+                  </p>
                 </div>
               )}
             </div>

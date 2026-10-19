@@ -16,7 +16,10 @@ const Guias = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const initialForm = { Titulo: '', Problema: '', Solucion: '' };
+  const initialForm = { Titulo: '', Problema: '', Solucion: '', IdTipoIncidencia: '' };
+  // Etapa 3: catálogo de tipos (para asociar cada guía) y áreas (para enviar por área)
+  const [tipos, setTipos] = useState([]);
+  const [areas, setAreas] = useState([]);
   const [formData, setFormData] = useState(initialForm);
 
   // Delete State
@@ -36,6 +39,8 @@ const Guias = () => {
 
   useEffect(() => {
     fetchGuias();
+    api.get('/tipos-incidencia').then(r => setTipos(r.data)).catch(() => setTipos([]));
+    api.get('/areas').then(r => setAreas(r.data)).catch(() => setAreas([]));
   }, []);
 
   const filteredGuias = guias.filter(g => 
@@ -59,18 +64,19 @@ const Guias = () => {
     e.stopPropagation();
     setIsEditing(true);
     setEditingId(guia.IdGuia);
-    setFormData({ Titulo: guia.Titulo, Problema: guia.Problema, Solucion: guia.Solucion });
+    setFormData({ Titulo: guia.Titulo, Problema: guia.Problema, Solucion: guia.Solucion, IdTipoIncidencia: guia.IdTipoIncidencia ?? '' });
     setShowModal(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const datos = { ...formData, IdTipoIncidencia: formData.IdTipoIncidencia === '' ? null : Number(formData.IdTipoIncidencia) };
     try {
       if (isEditing) {
-        await api.put(`/guias/${editingId}`, formData);
+        await api.put(`/guias/${editingId}`, datos);
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guía actualizada'}));
       } else {
-        await api.post('/guias', formData);
+        await api.post('/guias', datos);
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guía creada'}));
       }
       setShowModal(false);
@@ -99,12 +105,16 @@ const Guias = () => {
   };
 
   const handleOpenEmailList = () => {
-    setEmailModal({ show: true, correoDestino: '', sendToAll: false });
+    setEmailModal({ show: true, correoDestino: '', destino: 'correo', idArea: '' });
   };
 
   const executeSendEmailList = async (e) => {
     e.preventDefault();
-    if (emailModal.sendToAll) {
+    if (emailModal.destino === 'area' && !emailModal.idArea) {
+      window.dispatchEvent(new CustomEvent('app-error', {detail: 'Selecciona un área'}));
+      return;
+    }
+    if (emailModal.destino === 'todos') {
        try {
          const resp = await api.get('/adopcion');
          const total = resp.data.totalDestinatariosCorreo;
@@ -112,6 +122,9 @@ const Guias = () => {
        } catch (err) {
          if (!window.confirm('¿Estás seguro de enviar las guías a todo el personal?')) return;
        }
+    } else if (emailModal.destino === 'area') {
+       const nombreArea = areas.find(a => String(a.IdArea) === String(emailModal.idArea))?.NombreArea || '';
+       if (!window.confirm(`¿Enviar las guías a los usuarios del área ${nombreArea}?`)) return;
     }
     window.dispatchEvent(new CustomEvent('app-success', {detail: 'Iniciando envío de Guías...'}));
     try {
@@ -123,14 +136,17 @@ const Guias = () => {
       );
       
       window.dispatchEvent(new CustomEvent('app-success', {detail: 'Llamando a la API...'}));
-      await api.post('/reportes/enviar', {
-        email: emailModal.correoDestino,
-          sendToAll: emailModal.sendToAll,
+      const resp = await api.post('/reportes/enviar', {
+        email: emailModal.destino === 'correo' ? emailModal.correoDestino : undefined,
+        sendToAll: emailModal.destino === 'todos',
+        idArea: emailModal.destino === 'area' ? Number(emailModal.idArea) : undefined,
+        esGuias: true,
+        idsGuias: guias.map(g => g.IdGuia),
         pdfBase64,
         filename: `GuiasDeAyuda_${new Date().toISOString().split('T')[0]}.pdf`
       });
-      window.dispatchEvent(new CustomEvent('app-success', {detail: 'Guías enviadas por correo exitosamente'}));
-      setEmailModal({ show: false, correoDestino: '', sendToAll: false });
+      window.dispatchEvent(new CustomEvent('app-success', {detail: resp.data?.message || 'Guías enviadas por correo exitosamente'}));
+      setEmailModal({ show: false, correoDestino: '', destino: 'correo', idArea: '' });
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error en la petición de correo';
       window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
@@ -207,6 +223,7 @@ const Guias = () => {
               >
                 <div className="flex-1 pr-6">
                   <h3 className="font-bold text-gray-800 dark:text-gray-200 text-lg leading-tight mb-1">{guia.Titulo}</h3>
+                  {guia.NombreTipo && <span className="inline-block text-[11px] font-bold text-brand-blue bg-brand-blue/10 rounded-full px-2 py-0.5 mb-1">{guia.NombreTipo}</span>}
                   <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{guia.Problema}</p>
                 </div>
                 <div className={`p-2 rounded-full transition-all duration-300 ${expandedId === guia.IdGuia ? 'bg-brand-blue/10 text-brand-blue rotate-180' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
@@ -272,6 +289,19 @@ const Guias = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Tipo de incidencia que resuelve</label>
+                <select
+                  value={formData.IdTipoIncidencia}
+                  onChange={e => setFormData({...formData, IdTipoIncidencia: e.target.value})}
+                  className="input-modern"
+                >
+                  <option value="">(Sin tipo)</option>
+                  {tipos.filter(t => t.Activo || String(t.IdTipoIncidencia) === String(formData.IdTipoIncidencia)).map(t => (
+                    <option key={t.IdTipoIncidencia} value={t.IdTipoIncidencia}>{t.Nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Problema</label>
                 <textarea 
                   value={formData.Problema} 
@@ -323,20 +353,34 @@ const Guias = () => {
               <FiMail className="text-3xl text-blue-500" />
             </div>
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar Catálogo de Guías</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Ingresa el correo del destinatario:</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">¿A quién se las envías?</p>
             <form onSubmit={executeSendEmailList}>
-              <div className="mb-4 text-left">
-                <label className="flex items-center space-x-2 text-sm font-bold text-gray-700 dark:text-gray-300">
-                  <input 
-                    type="checkbox" 
-                    checked={emailModal.sendToAll} 
-                    onChange={e => setEmailModal({...emailModal, sendToAll: e.target.checked})}
-                    className="w-4 h-4 text-brand-blue rounded border-gray-300 focus:ring-brand-blue"
-                  />
-                  <span>Enviar a todo el personal (BCC)</span>
-                </label>
+              <div className="mb-4 text-left space-y-2">
+                {[['correo', 'A un correo'], ['todos', 'A todo el personal (copia oculta)'], ['area', 'A los usuarios de un área']].map(([valor, texto]) => (
+                  <label key={valor} className="flex items-center space-x-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+                    <input
+                      type="radio"
+                      name="destino"
+                      checked={emailModal.destino === valor}
+                      onChange={() => setEmailModal({...emailModal, destino: valor})}
+                      className="w-4 h-4 text-brand-blue border-gray-300 focus:ring-brand-blue"
+                    />
+                    <span>{texto}</span>
+                  </label>
+                ))}
               </div>
-              {!emailModal.sendToAll && (
+              {emailModal.destino === 'area' && (
+                <select
+                  required
+                  className="w-full p-2 border border-gray-300 rounded mb-4 text-lg focus:outline-none focus:border-brand-blue dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  value={emailModal.idArea}
+                  onChange={e => setEmailModal({...emailModal, idArea: e.target.value})}
+                >
+                  <option value="">Selecciona un área</option>
+                  {areas.map(a => <option key={a.IdArea} value={a.IdArea}>{a.NombreArea}</option>)}
+                </select>
+              )}
+              {emailModal.destino === 'correo' && (
                 <input 
                   type="email" 
                   required 
@@ -347,7 +391,7 @@ const Guias = () => {
                 />
               )}
               <div className="flex space-x-3">
-                <button type="button" onClick={() => setEmailModal({ show: false, correoDestino: '' })} className="flex-1 bg-gray-200 text-gray-800 dark:text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancelar</button>
+                <button type="button" onClick={() => setEmailModal({ show: false, correoDestino: '', destino: 'correo', idArea: '' })} className="flex-1 bg-gray-200 text-gray-800 dark:text-gray-200 font-bold py-2 rounded-lg hover:bg-gray-300 transition-colors">Cancelar</button>
                 <button type="submit" className="flex-1 bg-[#2988c9] text-white font-bold py-2 rounded-lg hover:bg-[#162d47] transition-colors">Enviar</button>
               </div>
             </form>

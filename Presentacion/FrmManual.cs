@@ -110,7 +110,7 @@ namespace Presentacion
                 ("titulo", "🏠 Inicio de Sesión"),
                 ("texto", "Esta es la puerta de entrada al sistema. Ingresa el nombre de usuario y la contraseña que te asignó el Administrador para acceder a tu cuenta."),
                 ("subtitulo", "¿Olvidaste tu contraseña?"),
-                ("texto", "El sistema no permite recuperar contraseñas por ti mismo (por seguridad, las contraseñas se guardan cifradas y nadie, ni siquiera el Administrador, puede ver la tuya original). Contacta al Administrador — él puede generarte una contraseña temporal nueva desde el módulo de Usuarios, o ponerte una que tú elijas."),
+                ("texto", "Usa el enlace de recuperación en la pantalla de Login e ingresa tu usuario o correo. Si corresponde a una cuenta activa, te llegará por correo una contraseña temporal que vence en 30 minutos. Tu contraseña actual sigue funcionando; si entras con la temporal, esa pasa a ser tu contraseña y conviene cambiarla en Mi Perfil. Solo se puede pedir una cada 5 minutos. Si no tienes acceso a tu correo, el Administrador puede generarte una contraseña desde el módulo de Usuarios."),
                 ("subtitulo", "Bloqueo de cuenta por seguridad"),
                 ("texto", "Si escribes tu contraseña incorrecta 5 veces seguidas, tu cuenta se bloquea automáticamente durante 5 minutos. Esto protege el sistema contra intentos de adivinar contraseñas. Si esto te pasa, simplemente espera el tiempo indicado y vuelve a intentar."),
                 ("subtitulo", "Verificar conexión"),

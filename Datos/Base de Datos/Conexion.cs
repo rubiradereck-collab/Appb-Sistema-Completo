@@ -94,6 +94,19 @@ namespace Datos.Base_de_Datos
             return dr.IsDBNull(i) ? (int?)null : dr.GetInt32(i);
         }
 
+        /// <summary>Entero nulo leído de cualquier columna numérica (smallint, int, bigint).</summary>
+        internal static int? EnteroNuloConvertido(NpgsqlDataReader dr, string col)
+        {
+            int i = dr.GetOrdinal(col);
+            return dr.IsDBNull(i) ? (int?)null : Convert.ToInt32(dr.GetValue(i));
+        }
+
+        internal static decimal? DecimalNulo(NpgsqlDataReader dr, string col)
+        {
+            int i = dr.GetOrdinal(col);
+            return dr.IsDBNull(i) ? (decimal?)null : Convert.ToDecimal(dr.GetValue(i));
+        }
+
         internal static long? LargoNulo(NpgsqlDataReader dr, string col)
         {
             int i = dr.GetOrdinal(col);

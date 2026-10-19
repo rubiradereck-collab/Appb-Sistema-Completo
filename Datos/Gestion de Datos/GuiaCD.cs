@@ -16,7 +16,9 @@ namespace Datos.Gestion_de_Datos
                     IdGuia = Entero(dr, "idguia"),
                     Titulo = Texto(dr, "titulo"),
                     Problema = Texto(dr, "problema"),
-                    Solucion = Texto(dr, "solucion")
+                    Solucion = Texto(dr, "solucion"),
+                    IdTipoIncidencia = EnteroNulo(dr, "idtipoincidencia"),
+                    NombreTipo = Texto(dr, "nombretipo")
                 }),
                 "Error al ejecutar el procedimiento Listar guías");
         }
@@ -40,6 +42,16 @@ namespace Datos.Gestion_de_Datos
                 P("problema", NpgsqlDbType.Text, oc.Problema),
                 P("solucion", NpgsqlDbType.Text, oc.Solucion)),
                 "Error al modificar en la tabla Guias");
+        }
+
+        /// <summary>Etapa 3: asigna (o quita, con null) el tipo de incidencia de la guía.</summary>
+        public static void AsignarTipo(int idGuia, int? idTipoIncidencia)
+        {
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_guias_asignartipo(@id, @idtipo)",
+                P("id", NpgsqlDbType.Integer, idGuia),
+                P("idtipo", NpgsqlDbType.Integer, idTipoIncidencia)),
+                "Error al asignar el tipo de la guía");
         }
 
         public static void EliminarGuia(Entidades.Gestion_de_Entidades.Guia oc)

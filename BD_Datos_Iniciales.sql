@@ -1,7 +1,7 @@
 /* ============================================================================
    Datos iniciales del Sistema de Incidencias APPB (PostgreSQL)
 
-   Se ejecuta UNA vez, después de BD_Completa.sql y BD_Etapa2.sql, en una base nueva.
+   Se ejecuta UNA vez, después de BD_Completa.sql y los scripts BD_Etapa2/3/4.sql, en una base nueva.
    Es seguro volver a ejecutarlo: solo inserta lo que falta.
 
    ANTES DE EJECUTAR: cambia la contraseña del administrador inicial en la

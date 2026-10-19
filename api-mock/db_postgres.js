@@ -35,6 +35,9 @@ const NOMBRES_COLUMNAS = [
   // Etapa 2
   'IdTipoIncidencia', 'IdUsuarioReporta', 'FechaAsignacion', 'FechaPrimeraRespuesta', 'EscaladoSLAProceso',
   'Activo', 'TotalIncidencias', 'NombreUsuarioReporta',
+  // Etapa 3
+  'Calificacion', 'FechaCalificacion', 'NombreTipo', 'IdEnvio', 'Canal', 'TipoDestino', 'Destinatarios',
+  'TotalDestinatarios', 'TotalGuias', 'Guias', 'Resultado',
   // Alias usados en las consultas
   'NombreEstado', 'NombrePrioridad', 'NombreTecnicoAsignado', 'TecnicoAsignado', 'TestStatus', 'Total'
 ];

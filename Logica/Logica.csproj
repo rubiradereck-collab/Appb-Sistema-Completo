@@ -68,6 +68,8 @@
     <Compile Include="Gestion de Logica\ReporteMensualLN.cs" />
     <Compile Include="Gestion de Logica\SlaLN.cs" />
     <Compile Include="Gestion de Logica\TipoIncidenciaLN.cs" />
+    <Compile Include="Gestion de Logica\GuiaEnvioLN.cs" />
+    <Compile Include="Gestion de Logica\LineaBaseLN.cs" />
     <Compile Include="Gestion de Logica\UsuarioLN.cs" />
     <Compile Include="LogicaExcepciones.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

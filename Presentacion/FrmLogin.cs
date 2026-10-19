@@ -46,6 +46,14 @@ namespace Presentacion
 
                 if (usuarioValido != null)
                 {
+                    if (_usuarioLN.UltimoLoginConTemporal)
+                    {
+                        MessageBox.Show(
+                            "Ingresaste con la contraseña temporal de recuperación, que ahora es tu contraseña.\n\n" +
+                            "Cámbiala por una que solo tú conozcas en \"Mi Perfil\".",
+                            "Contraseña temporal", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+
                     FrmPrincipal frmPrincipal = new FrmPrincipal(usuarioValido);
                     this.Hide();
                     frmPrincipal.ShowDialog(); 
@@ -86,7 +94,7 @@ namespace Presentacion
         /// Guarda el detalle completo del error en %LOCALAPPDATA%\APPB\errores.log
         /// para que soporte pueda revisarlo. Devuelve la ruta, o null si no se pudo escribir.
         /// </summary>
-        private static string GuardarErrorEnLog(Exception ex)
+        internal static string GuardarErrorEnLog(Exception ex)
         {
             try
             {
@@ -119,30 +127,38 @@ namespace Presentacion
             if (string.IsNullOrWhiteSpace(valor))
                 return;
 
+            // Etapa 4: mismo mensaje exista o no la cuenta (no revela qué usuarios o correos existen).
+            // La clave temporal se guarda aparte y vence en 30 minutos: la contraseña actual sigue
+            // funcionando, así nadie puede dejar a otra persona sin acceso pidiendo recuperaciones.
+            const string mensajeGenerico =
+                "Si los datos corresponden a una cuenta activa, se envió una contraseña temporal a su correo registrado.\n\n" +
+                "La contraseña temporal vence en 30 minutos. Tu contraseña actual sigue funcionando.";
             try
             {
                 var usuarioLN = new UsuarioLN();
                 Usuario usuario = usuarioLN.BuscarPorUsuarioOCorreo(valor.Trim());
 
-                if (usuario == null || string.IsNullOrWhiteSpace(usuario.Correo))
+                if (usuario != null && usuario.Estado && !string.IsNullOrWhiteSpace(usuario.Correo))
                 {
-                    MessageBox.Show("No se encontró ninguna cuenta con ese usuario o correo.",
-                        "Recuperar contraseña", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    string passwordTemporal = usuarioLN.SolicitarRecuperacion(usuario);
+                    if (passwordTemporal == null)
+                    {
+                        MessageBox.Show($"Ya se envió una contraseña temporal hace poco. Revisa tu correo o espera {UsuarioLN.MINUTOS_ENTRE_SOLICITUDES} minutos para pedir otra.",
+                            "Recuperar contraseña", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    CorreoService.EnviarCorreo(
+                        usuario.Correo,
+                        "Recuperación de contraseña - Sistema de Incidencias APPB",
+                        $"Hola {usuario.Nombre},\n\nTu contraseña temporal es: {passwordTemporal}\n\n" +
+                        $"Vence en {UsuarioLN.MINUTOS_VALIDEZ_TEMPORAL} minutos. Tu contraseña actual sigue funcionando; " +
+                        "si entras con la temporal, esa pasa a ser tu contraseña y te recomendamos cambiarla en Mi Perfil.\n\n" +
+                        "Si no solicitaste este cambio, ignora este correo."
+                    );
                 }
 
-                string passwordTemporal = usuarioLN.GenerarPasswordTemporal(usuario);
-
-                CorreoService.EnviarCorreo(
-                    usuario.Correo,
-                    "Recuperación de contraseña - Sistema de Incidencias APPB",
-                    $"Hola {usuario.Nombre},\n\nTu nueva contraseña temporal es: {passwordTemporal}\n\n" +
-                    "Por seguridad, te recomendamos cambiarla apenas inicies sesión.\n\n" +
-                    "Si no solicitaste este cambio, contacta al administrador del sistema de inmediato."
-                );
-
-                MessageBox.Show($"Se envió una contraseña temporal a {usuario.Correo}.",
-                    "Recuperar contraseña", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(mensajeGenerico, "Recuperar contraseña", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (LogicaExcepciones lex)
             {

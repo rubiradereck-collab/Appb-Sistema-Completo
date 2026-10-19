@@ -141,8 +141,16 @@ const Profile = () => {
     }
   };
 
-  const handleTelegram = () => {
-    window.open('tg://resolve?domain=TuBotDeAPPB', '_blank');
+  // Etapa 4: el nombre real del Bot lo da la API (antes apuntaba a un bot de ejemplo)
+  const handleTelegram = async () => {
+    try {
+      const res = await api.get('/telegram/bot');
+      const nombre = res.data?.username;
+      if (!nombre) throw new Error('sin bot');
+      window.open(`https://t.me/${nombre}`, '_blank');
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('app-error', { detail: 'El Bot de Telegram no está configurado en el servidor.' }));
+    }
   };
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${user?.Nombre}+${user?.Apellido}&background=2988c9&color=fff&size=128`;

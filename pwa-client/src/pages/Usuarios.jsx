@@ -22,12 +22,15 @@ const Usuarios = () => {
     UsuarioLogin: '',
     Password: '',
     Rol: 'Usuario',
-    Estado: true
+    Estado: true,
+    IdArea: ''
   };
+  const [areas, setAreas] = useState([]);
   const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
     fetchUsuarios();
+    api.get('/areas').then(r => setAreas(r.data)).catch(() => setAreas([]));
   }, []);
 
   const fetchUsuarios = async () => {
@@ -50,7 +53,8 @@ const Usuarios = () => {
       UsuarioLogin: usuario.Usuario || usuario.UsuarioLogin, // support both depending on API mapping
       Password: '', // Don't fetch password
       Rol: usuario.Rol,
-      Estado: usuario.Estado
+      Estado: usuario.Estado,
+      IdArea: usuario.IdArea ?? ''
     });
     setShowModal(true);
   };
@@ -66,10 +70,10 @@ const Usuarios = () => {
     e.preventDefault();
     try {
       if (isEditing) {
-        await api.put(`/usuarios/${editingId}`, formData);
+        await api.put(`/usuarios/${editingId}`, { ...formData, IdArea: formData.IdArea === '' ? null : Number(formData.IdArea) });
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Usuario modificado con éxito'}));
       } else {
-        await api.post('/usuarios', formData);
+        await api.post('/usuarios', { ...formData, IdArea: formData.IdArea === '' ? null : Number(formData.IdArea) });
         window.dispatchEvent(new CustomEvent('app-success', {detail: 'Usuario creado con éxito'}));
       }
       setShowModal(false);
@@ -268,6 +272,15 @@ const Usuarios = () => {
                   <option value="Técnico">Técnico</option>
                   <option value="Administrador">Administrador</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 ml-1">Área</label>
+                <select className="input-modern" value={formData.IdArea} onChange={e => setFormData({...formData, IdArea: e.target.value})}>
+                  <option value="">(Sin área)</option>
+                  {areas.map(a => <option key={a.IdArea} value={a.IdArea}>{a.NombreArea}</option>)}
+                </select>
+                <p className="text-xs text-gray-500 mt-1 ml-1">Se usa para enviarle las guías de su área.</p>
               </div>
 
               <div className="pt-2">

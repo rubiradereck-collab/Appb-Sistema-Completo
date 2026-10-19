@@ -14,5 +14,14 @@ namespace Reportes
         public Dictionary<string, Tuple<int, double>> MetricasPorTecnico { get; set; } = new Dictionary<string, Tuple<int, double>>();
         public double? TiempoPromedioResolucionHoras { get; set; }
         public double AdopcionPorcentaje { get; set; }
+
+        // Etapa 3
+        /// <summary>% de tickets resueltos/cerrados dentro del tiempo de su prioridad (Alta 4 h, Media 24 h, Baja 72 h).</summary>
+        public double? PorcentajeSlaCumplido { get; set; }
+        public int TicketsEvaluadosSla { get; set; }
+        /// <summary>Promedio de horas entre el reporte y la primera respuesta (solo tickets que la tienen).</summary>
+        public double? TiempoPrimeraRespuestaHoras { get; set; }
+        public double? SatisfaccionPromedio { get; set; }
+        public int TotalCalificaciones { get; set; }
     }
 }

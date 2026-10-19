@@ -19,19 +19,21 @@ const timeAgo = (dateString) => {
 };
 
 export const StatusChip = ({ status, idEstado }) => {
-  // 1: Abierto (Rojo), 2: En Proceso (Azul), 3: Resuelto (Amarillo), 4: Cerrado (Verde)
+  // Etapa 4: el color se elige por el nombre del estado, no por su Id
   let bg = 'bg-gray-100 dark:bg-gray-700';
   let text = 'text-gray-700 dark:text-gray-300';
   let Icon = FiClock;
 
-  if (idEstado === 1 || status === 'Abierto') {
+  if (status === 'Pendiente' || status === 'Abierto') {
     bg = 'bg-red-100 dark:bg-red-900/30'; text = 'text-red-700 dark:text-red-400'; Icon = FiAlertCircle;
-  } else if (idEstado === 2 || status === 'En Proceso') {
+  } else if (status === 'En Proceso') {
     bg = 'bg-blue-100 dark:bg-blue-900/30'; text = 'text-blue-700 dark:text-blue-400';
-  } else if (idEstado === 3 || status === 'Resuelto') {
+  } else if (status === 'Resuelto') {
     bg = 'bg-yellow-100 dark:bg-yellow-900/30'; text = 'text-yellow-700 dark:text-yellow-400'; Icon = FiCheckCircle;
-  } else if (idEstado === 4 || status === 'Cerrado') {
+  } else if (status === 'Cerrado') {
     bg = 'bg-green-100 dark:bg-green-900/30'; text = 'text-green-700 dark:text-green-400'; Icon = FiCheckCircle;
+  } else if (status === 'Anulado') {
+    bg = 'bg-gray-200 dark:bg-gray-700'; text = 'text-gray-500 dark:text-gray-400 line-through';
   }
 
   return (

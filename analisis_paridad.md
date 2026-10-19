@@ -1,81 +1,38 @@
-# Análisis Profundo de Paridad: App Escritorio (C#) vs App Móvil/PWA (React)
+# Paridad entre la app de escritorio y la app móvil/PWA
 
-Este documento contiene un análisis exhaustivo de cada módulo, funcionalidad y comportamiento entre ambas aplicaciones, que ahora conviven en el mismo ecosistema conectadas a la misma base de datos SQL Server y API Node.js.
+Actualizado en la Etapa 4 (octubre de 2026). La versión anterior de este documento afirmaba una
+paridad del 100 % que no era real (por ejemplo, el perfil de la app no guardaba los cambios).
+Aquí se indica lo que hace cada canal hoy.
 
-## 1. Módulo de Autenticación y Sesión
-- **Escritorio (C#):** 
-  - Conexión directa a SQL Server.
-  - Validación de credenciales con `BCrypt`.
-  - Sesión global en clase estática `UsuarioActual`.
-  - Roles soportados: `Administrador`, `Usuario`, `Tecnico`.
-- **Móvil/PWA:** 
-  - Conexión mediante API Node.js (`/api/auth/login`).
-  - Validación con `BCrypt` en el servidor.
-  - Generación de token JWT (firmado) almacenado en `localStorage`.
-  - Manejo de sesión global vía React Context (`AuthContext`).
-- **Veredicto:** **PARIDAD TOTAL (100%)**. La seguridad en PWA es moderna y robusta (JWT) evitando exponer la cadena de conexión SQL en el código de frontend.
+Arquitectura: el escritorio (C#) se conecta directo a PostgreSQL con el usuario `appb_escritorio`,
+que solo puede ejecutar las funciones `sp_*`. La app móvil/PWA usa la API Node.js (JWT). Las dos
+comparten la misma base de datos y, desde las etapas 2 a 4, las mismas reglas de negocio.
 
-## 2. Dashboard y Estadísticas
-- **Escritorio (C#):** 
-  - Tarjetas de resumen (Total, Resueltos, Pendientes, Cerrados).
-  - Gráfico de Pastel (Incidencias por Área).
-  - Gráfico de Barras (Incidencias por Estado).
-- **Móvil/PWA:** 
-  - Tarjetas de resumen adaptables a pantallas móviles.
-  - Gráficos interactivos usando la librería `Recharts` (Pastel y Barras).
-- **Veredicto:** **PARIDAD TOTAL (100%)**. Los gráficos en la PWA son incluso más interactivos gracias a HTML5.
+| Módulo | Escritorio | App móvil | Paridad |
+|---|---|---|---|
+| Inicio de sesión | BCrypt; bloqueo 5 intentos / 5 min; recuperación con clave temporal de 30 min | Igual (misma función de bloqueo en la BD; misma recuperación) | Completa |
+| Perfil | Datos, foto (2 MB), contraseña | Datos, foto (2 MB), contraseña, enlace al Bot | Completa |
+| Incidencias: crear | Todos los campos; tipo del catálogo | Todos los campos; tipo del catálogo | Completa |
+| Incidencias: editar | Todos los campos según el rol; control de concurrencia | Estado, observaciones y "asignarme"; control de concurrencia | Parcial: la app no edita área, tipo ni descripción |
+| Incidencias: anular / borrar | Anular (admin, con motivo) y borrado definitivo explícito | Anular (admin, con motivo) | Parcial: borrado definitivo solo en escritorio |
+| Encuesta de satisfacción | — (se responde en la app o en Telegram) | Calificar 1 a 5 en el detalle del ticket | Solo app y Telegram |
+| Dashboard | Tarjetas, adopción, gráficos, filtros (incluye mes anterior), envío por correo | Tarjetas, gráficos, filtros, exportación | Completa en lo esencial |
+| Informe final y línea base | Sí (Dashboard → Informe final) | No | Solo escritorio |
+| Reportes PDF/Excel de incidencias | Sí | Sí (generados en el teléfono) | Completa |
+| Guías | CRUD con tipo; envío a un correo, a todos o por área; PDF/Excel | CRUD con tipo; envío a un correo, a todos o por área; PDF/Excel | Completa |
+| Catálogo de tipos de incidencia | Sí (Áreas → Tipos de incidencia) | No hay pantalla (la API ya tiene las rutas) | Solo escritorio |
+| Usuarios | CRUD con área; restablecer contraseña | CRUD con área; restablecer contraseña | Completa |
+| Áreas | CRUD | CRUD | Completa |
+| Auditoría | Consulta | Consulta | Completa |
 
-## 3. Gestión de Incidencias (Tickets)
-- **Escritorio (C#):** 
-  - CRUD completo (Crear, Editar, Eliminar - solo Admin).
-  - Listado con filtros combinados (Texto, Estado, Fechas).
-  - Resolución: Permite al Técnico asignar nota de solución y cambiar estado.
-  - Generación de reportes PDF/Excel y envío de correos.
-- **Móvil/PWA:** 
-  - Creación de tickets (`NewIncident.jsx`) y listado con tarjetas (`Incidencias.jsx`).
-  - Filtros avanzados en tiempo real en la vista.
-  - Resolución: Vista detallada (`IncidentDetail.jsx`) que permite cambiar de estado y documentar solución.
-  - Exportación PDF/Excel de los datos filtrados en pantalla.
-- **Veredicto:** **PARIDAD TOTAL (100%)**. La vista de tarjetas en PWA mejora la legibilidad en pantallas táctiles de celulares.
+## Diferencias que se mantienen a propósito
 
-## 4. Base de Conocimientos (Guías)
-- **Escritorio (C#):** 
-  - Lista de guías de soporte (Problema -> Solución).
-  - CRUD para Administradores.
-  - Exportación PDF/Excel y envío por correo con botón en la UI.
-- **Móvil/PWA:** 
-  - Lista interactiva de guías tipo "Acordeón" (`Guias.jsx`).
-  - Modal para Crear/Editar/Eliminar (solo Admin).
-  - Opciones de correo y exportación.
-- **Veredicto:** **PARIDAD TOTAL (100%)**. El diseño en acordeón de la PWA es perfecto para lectura en móviles.
+- **Borrado definitivo de incidencias:** solo en el escritorio, para limpiar registros de prueba o
+  duplicados. Lo normal es anular.
+- **Informe final, línea base y catálogo de tipos:** son tareas de administración poco frecuentes;
+  quedaron en el escritorio.
 
-## 5. Módulo Administrativo (Usuarios y Áreas)
-- **Escritorio (C#):** 
-  - Formularios `FrmUsuarios` y `FrmAreas` para gestión de catálogos y reseteo de contraseñas.
-- **Móvil/PWA:** 
-  - Vistas `Usuarios.jsx` y `Areas.jsx` con tablas responsivas.
-  - Soporta reseteo de contraseña y eliminación de usuarios/áreas.
-- **Veredicto:** **PARIDAD TOTAL (100%)**.
+## Límite conocido
 
-## 6. Auditoría y Logs
-- **Escritorio (C#):** 
-  - Visor simple en `FrmAuditoria`.
-- **Móvil/PWA:** 
-  - Vista `Auditoria.jsx` que consume la tabla `Auditoria` de SQL y la muestra ordenada cronológicamente.
-- **Veredicto:** **PARIDAD TOTAL (100%)**.
-
-## 7. Perfil y Bot de Telegram
-- **Escritorio (C#):** 
-  - Actualización de datos, cambio de contraseña, y subida de foto de perfil binaria.
-- **Móvil/PWA:** 
-  - `Profile.jsx` permite actualizar información, cambiar contraseña de forma segura, y muestra las instrucciones exactas para enlazar el bot de Telegram (`@appb2027_incidencias_bot`).
-- **Veredicto:** **PARIDAD TOTAL (100%)**.
-
-## Puntos de Mejora / Recomendaciones Finales
-Aunque ambas plataformas gozan de paridad funcional al 100%, destaco lo siguiente para la etapa de producción:
-1. **Reportes PDF/Excel centralizados:** Actualmente la PWA genera sus PDFs de manera eficiente en el celular (`pdfmake`). Sin embargo, acabamos de programar los endpoints nativos en Node.js. Esto es excelente porque te da la flexibilidad de usar el motor de reportes del servidor si el celular de un usuario es muy antiguo y no puede renderizar PDFs complejos localmente.
-2. **Sincronización en Tiempo Real:** La PWA actualmente refresca las incidencias cada 15 segundos (`setInterval`). Para un entorno corporativo, se recomienda migrar a `WebSockets` (Socket.io) en un futuro, para que los tickets nuevos aparezcan al milisegundo sin recargar.
-3. **Escalabilidad de Imágenes:** Las fotos de perfil se guardan en base de datos como base64/binario. Funciona bien para perfiles, pero si en el futuro se planean adjuntar fotos pesadas a las Incidencias, se debe usar un servidor de archivos local.
-
-**Conclusión del Análisis:**
-El ecosistema es maduro. La aplicación de Escritorio funciona como un tanque local robusto, y la Aplicación Móvil sirve como el puente táctil y remoto, ambas respetando exactamente las mismas reglas de negocio. La integración con Capacitor para Android y el Backend en Node.js fue un éxito rotundo.
+Quien tenga la cadena de conexión de `appb_escritorio` puede llamar a las funciones `sp_*` por
+fuera de la app. Cerrarlo del todo requiere que el escritorio también pase por la API.

@@ -23,6 +23,7 @@ const IncidentDetail = () => {
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [enviandoNota, setEnviandoNota] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, isDestructive: false });
 
@@ -52,8 +53,10 @@ const IncidentDetail = () => {
     setGuardando(true);
     try {
       await api.put(`/incidencias/${id}`, {
-        IdEstado: nuevoEstado,
-        Observaciones: observaciones
+        IdEstado: Number(nuevoEstado),
+        Observaciones: observaciones,
+        // Etapa 4: si otra persona la cambió mientras tanto, la API responde 409
+        FilaVersion: incidencia.FilaVersion
       });
       
         if (Capacitor.isNativePlatform()) {
@@ -64,6 +67,7 @@ const IncidentDetail = () => {
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Error al actualizar';
       window.dispatchEvent(new CustomEvent('app-error', {detail: errorMsg}));
+      if (error.response?.data?.conflicto) fetchDetail();
     }
     setGuardando(false);
   };
@@ -80,7 +84,8 @@ const IncidentDetail = () => {
         try {
           await api.put(`/incidencias/${id}`, {
             IdTecnicoAsignado: user.IdUsuario,
-            IdEstado: 2 // En Proceso
+            // Etapa 4: el Id de "En Proceso" se busca por nombre
+            IdEstado: estados.find(e => e.NombreEstado === 'En Proceso')?.IdEstado ?? incidencia.IdEstado
           });
           
         if (Capacitor.isNativePlatform()) {
@@ -101,6 +106,27 @@ const IncidentDetail = () => {
   if (!incidencia) return <div className="p-8 text-center text-red-500">No se encontró la incidencia</div>;
 
   const isTechOrAdmin = user.Rol === 'Técnico' || user.Rol === 'Administrador';
+
+  // Etapa 3: encuesta de satisfacción para quien reportó, con el ticket Resuelto o Cerrado
+  const nombreEstado = estados.find(e => e.IdEstado === incidencia.IdEstado)?.NombreEstado;
+  const nombreYo = `${(user.Nombre || '').trim()} ${(user.Apellido || '').trim()}`.trim().toLowerCase();
+  const esMiTicket = incidencia.IdUsuarioReporta
+    ? incidencia.IdUsuarioReporta === user.IdUsuario
+    : (incidencia.Empleado || '').trim().toLowerCase() === nombreYo;
+  const puedeCalificar = esMiTicket && (nombreEstado === 'Resuelto' || nombreEstado === 'Cerrado') && incidencia.Calificacion == null;
+
+  const enviarCalificacion = async (nota) => {
+    setEnviandoNota(true);
+    try {
+      await api.post(`/incidencias/${id}/calificacion`, { Calificacion: nota });
+      setIncidencia({ ...incidencia, Calificacion: nota });
+      window.dispatchEvent(new CustomEvent('app-success', { detail: '¡Gracias por tu calificación!' }));
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'No se pudo guardar la calificación';
+      window.dispatchEvent(new CustomEvent('app-error', { detail: errorMsg }));
+    }
+    setEnviandoNota(false);
+  };
   const areaName = areas.find(a => a.IdArea === incidencia.IdArea)?.NombreArea || 'N/A';
 
   return (
@@ -200,14 +226,17 @@ const IncidentDetail = () => {
                     onClick={() => {
                       setConfirmModal({
                         show: true,
-                        title: 'Eliminar Incidencia',
-                        message: '¿Estás seguro de que deseas ELIMINAR permanentemente esta incidencia? Esta acción no se puede deshacer.',
+                        title: 'Anular Incidencia',
+                        message: 'La incidencia pasará al estado Anulado: deja de atenderse, pero queda en el historial y en los informes.',
                         isDestructive: true,
                         onConfirm: async () => {
                           setConfirmModal({ show: false });
+                          // Etapa 4: se anula (el borrado definitivo solo existe en el escritorio)
+                          const motivo = window.prompt('Motivo de la anulación (por ejemplo: duplicado, reportado por error):', '');
+                          if (motivo === null || !motivo.trim()) return;
                           try {
-                            await api.delete(`/incidencias/${id}`);
-                            window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia eliminada exitosamente.'}));
+                            await api.delete(`/incidencias/${id}`, { data: { motivo: motivo.trim() } });
+                            window.dispatchEvent(new CustomEvent('app-success', {detail: 'Incidencia anulada.'}));
                             navigate('/incidencias');
                           } catch (error) {
                             const errorMsg = error.response?.data?.message || 'Error al eliminar incidencia.';
@@ -218,7 +247,7 @@ const IncidentDetail = () => {
                     }}
                     className="w-full mt-2 bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200 transition-colors"
                   >
-                    Eliminar Incidencia
+                    Anular Incidencia
                   </button>
                 )}
               </div>
@@ -256,17 +285,47 @@ const IncidentDetail = () => {
                 </div>
               )}
 
-              {incidencia.IdEstado >= 3 && (
+              {['Resuelto', 'Cerrado', 'Anulado'].includes(nombreEstado) && (
                 <div className="relative pl-6">
-                  <div className="absolute w-4 h-4 bg-[#10b981] rounded-full -left-[9px] top-1 border-2 border-white shadow-sm"></div>
-                  <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Estado actualizado a Resuelto</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">El técnico ha marcado el ticket como resuelto.</p>
+                  <div className={`absolute w-4 h-4 ${nombreEstado === 'Anulado' ? 'bg-gray-400' : 'bg-[#10b981]'} rounded-full -left-[9px] top-1 border-2 border-white shadow-sm`}></div>
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Estado actualizado a {nombreEstado}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {nombreEstado === 'Anulado' ? 'El ticket fue anulado y ya no se atenderá.' : `El técnico marcó el ticket como ${nombreEstado.toLowerCase()}.`}
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
         </div>
+
+        {(puedeCalificar || (esMiTicket && incidencia.Calificacion != null)) && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mt-4">
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-1">¿Cómo calificas la atención?</h3>
+            {incidencia.Calificacion != null ? (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Calificaste este ticket con {incidencia.Calificacion} de 5 {'⭐'.repeat(incidencia.Calificacion)}. ¡Gracias!
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">1 = muy mala, 5 = excelente</p>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      disabled={enviandoNota}
+                      onClick={() => enviarCalificacion(n)}
+                      className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-600 font-bold text-gray-800 dark:text-gray-200 hover:bg-yellow-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                      aria-label={`Calificar con ${n} de 5`}
+                    >
+                      {n} ⭐
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Confirm Modal */}

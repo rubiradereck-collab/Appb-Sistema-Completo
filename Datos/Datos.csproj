@@ -105,6 +105,8 @@
     <Compile Include="Gestion de Datos\IncidenciaCD.cs" />
     <Compile Include="Gestion de Datos\PrioridadCD.cs" />
     <Compile Include="Gestion de Datos\TipoIncidenciaCD.cs" />
+    <Compile Include="Gestion de Datos\GuiaEnvioCD.cs" />
+    <Compile Include="Gestion de Datos\LineaBaseCD.cs" />
     <Compile Include="Gestion de Datos\UsuarioCD.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Settings.Designer.cs">

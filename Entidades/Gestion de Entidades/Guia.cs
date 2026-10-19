@@ -29,6 +29,10 @@ namespace Entidades.Gestion_de_Entidades
         public string Titulo { get => titulo; set => titulo = value; }
         public string Problema { get => problema; set => problema = value; }
         public string Solucion { get => solucion; set => solucion = value; }
+
+        // Etapa 3: tipo de incidencia que resuelve la guía. NombreTipo es solo lectura (viene del listado).
+        public int? IdTipoIncidencia { get; set; }
+        public string NombreTipo { get; set; }
     }
 
 }

@@ -11,7 +11,7 @@ namespace Datos.Gestion_de_Datos
     {
         private const string ColumnasUsuario =
             "idusuario, nombre, apellido, correo, usuario, password, rol, estado, " +
-            "telegramchatid, intentosfallidos, bloqueadohasta, fotoperfil";
+            "telegramchatid, intentosfallidos, bloqueadohasta, fotoperfil, idarea, nombrearea";
 
         private static T LeerUsuario<T>(Npgsql.NpgsqlDataReader dr) where T : sp_Usuarios_ListarResult, new()
         {
@@ -28,7 +28,9 @@ namespace Datos.Gestion_de_Datos
                 TelegramChatId = LargoNulo(dr, "telegramchatid"),
                 IntentosFallidos = Entero(dr, "intentosfallidos"),
                 BloqueadoHasta = FechaNula(dr, "bloqueadohasta"),
-                FotoPerfil = Bytes(dr, "fotoperfil")
+                FotoPerfil = Bytes(dr, "fotoperfil"),
+                IdArea = EnteroNulo(dr, "idarea"),
+                NombreArea = Texto(dr, "nombrearea")
             };
         }
 
@@ -80,6 +82,48 @@ namespace Datos.Gestion_de_Datos
                 P("telegramchatid", NpgsqlDbType.Bigint, oc.TelegramChatId),
                 P("fotoperfil", NpgsqlDbType.Bytea, oc.FotoPerfil)),
                 "Error al modificar en la tabla Usuarios");
+        }
+
+        /// <summary>Etapa 3: asigna (o quita, con null) el área del usuario.</summary>
+        public static void AsignarArea(int idUsuario, int? idArea)
+        {
+            ManejoErrores.Intentar(() => Ejecutar(
+                "SELECT sp_usuarios_asignararea(@id, @idarea)",
+                P("id", NpgsqlDbType.Integer, idUsuario),
+                P("idarea", NpgsqlDbType.Integer, idArea)),
+                "Error al asignar el área del usuario");
+        }
+
+        // ---- Etapa 4: contraseña temporal de recuperación (guardada aparte, con vencimiento) ----
+
+        /// <summary>true = guardada; false = ya se pidió una hace muy poco.</summary>
+        public static bool SolicitarTemporal(int idUsuario, string hash, int validezMinutos, int esperaMinutos)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_usuarios_solicitartemporal(@id, @hash, @validez, @espera)",
+                P("id", NpgsqlDbType.Integer, idUsuario),
+                P("hash", NpgsqlDbType.Varchar, hash),
+                P("validez", NpgsqlDbType.Integer, validezMinutos),
+                P("espera", NpgsqlDbType.Integer, esperaMinutos)) == 1,
+                "Error al guardar la contraseña temporal");
+        }
+
+        /// <summary>Hash de la clave temporal vigente, o null.</summary>
+        public static string ObtenerTemporal(int idUsuario)
+        {
+            return ManejoErrores.Intentar(() => Listar(
+                "SELECT passwordtemporal FROM sp_usuarios_obtenertemporal(@id)",
+                dr => Texto(dr, "passwordtemporal"),
+                P("id", NpgsqlDbType.Integer, idUsuario)).FirstOrDefault(),
+                "Error al leer la contraseña temporal");
+        }
+
+        public static bool UsarTemporal(int idUsuario)
+        {
+            return ManejoErrores.Intentar(() => EscalarEntero(
+                "SELECT sp_usuarios_usartemporal(@id)",
+                P("id", NpgsqlDbType.Integer, idUsuario)) == 1,
+                "Error al activar la contraseña temporal");
         }
 
         public static void EliminarUsuario(Entidades.Gestion_de_Entidades.Usuario oc)

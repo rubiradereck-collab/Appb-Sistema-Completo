@@ -28,6 +28,8 @@ namespace Logica.Gestion_de_Logica
                 {
                     byte[] fotoBytes = obj.FotoPerfil != null ? obj.FotoPerfil.ToArray() : null;
                     oc = new Usuario(obj.IdUsuario, obj.Nombre, obj.Apellido, obj.Correo, obj.Usuario, obj.Password, obj.Rol, obj.Estado, obj.TelegramChatId, fotoBytes);
+                    oc.IdArea = obj.IdArea;
+                    oc.NombreArea = obj.NombreArea;
                     lista.Add(oc);
                 }
             }
@@ -58,6 +60,19 @@ namespace Logica.Gestion_de_Logica
                 }
 
                 bool passwordValido = BCrypt.Net.BCrypt.Verify(password, encontrado.Password);
+                UltimoLoginConTemporal = false;
+
+                // Etapa 4: si no coincide, se prueba la clave temporal de recuperación (si está vigente)
+                if (!passwordValido)
+                {
+                    string temporal = UsuarioCD.ObtenerTemporal(encontrado.IdUsuario);
+                    if (temporal != null && BCrypt.Net.BCrypt.Verify(password, temporal) && UsuarioCD.UsarTemporal(encontrado.IdUsuario))
+                    {
+                        passwordValido = true;
+                        UltimoLoginConTemporal = true;
+                        encontrado.Password = temporal;
+                    }
+                }
 
                 if (!passwordValido)
                 {
@@ -73,7 +88,11 @@ namespace Logica.Gestion_de_Logica
                     encontrado.IdUsuario, encontrado.Nombre, encontrado.Apellido, encontrado.Correo,
                     encontrado.Usuario, encontrado.Password, encontrado.Rol, encontrado.Estado,
                     encontrado.TelegramChatId, fotoBytes
-                );
+                )
+                {
+                    IdArea = encontrado.IdArea,
+                    NombreArea = encontrado.NombreArea
+                };
             }
             catch (LogicaExcepciones)
             {
@@ -85,7 +104,33 @@ namespace Logica.Gestion_de_Logica
             }
         }
 
-        private const int TAMANO_MAXIMO_FOTO_BYTES = 2 * 1024 * 1024; // 2 MB
+        private const int TAMANO_MAXIMO_FOTO_BYTES = 2 * 1024 * 1024; // 2 MB (la API usa el mismo límite)
+
+        /// <summary>true si el último Login() entró con la clave temporal de recuperación.</summary>
+        public bool UltimoLoginConTemporal { get; private set; }
+
+        public const int MINUTOS_VALIDEZ_TEMPORAL = 30;
+        public const int MINUTOS_ENTRE_SOLICITUDES = 5;
+
+        /// <summary>
+        /// Etapa 4: recuperación de contraseña. Genera una clave temporal que se guarda aparte y vence
+        /// en 30 minutos; la contraseña actual sigue funcionando. Devuelve la clave para enviarla por
+        /// correo, o null si ya se pidió una hace menos de 5 minutos.
+        /// </summary>
+        public string SolicitarRecuperacion(Usuario oe)
+        {
+            try
+            {
+                string temporal = CrearPasswordAleatoria(10);
+                string hash = BCrypt.Net.BCrypt.HashPassword(temporal);
+                return UsuarioCD.SolicitarTemporal(oe.IdUsuario, hash, MINUTOS_VALIDEZ_TEMPORAL, MINUTOS_ENTRE_SOLICITUDES) ? temporal : null;
+            }
+            catch (DatosExcepciones dex) { throw new LogicaExcepciones(dex.Message, dex); }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al generar la contraseña de recuperación", ex);
+            }
+        }
 
         public bool ActualizarFotoPerfil(Usuario oe, byte[] fotoBytes)
         {
@@ -162,6 +207,23 @@ namespace Logica.Gestion_de_Logica
             catch (Exception ex)
             {
                 throw new LogicaExcepciones("Error al cambiar la contraseña del usuario", ex);
+            }
+        }
+
+        /// <summary>Etapa 3: asigna (o quita, con null) el área de un usuario.</summary>
+        public void AsignarArea(int idUsuario, int? idArea)
+        {
+            try
+            {
+                if (idArea.HasValue && !AreaCD.ListarAreas().Any(a => a.IdArea == idArea.Value))
+                    throw new LogicaExcepciones("El área seleccionada no existe.", null);
+                UsuarioCD.AsignarArea(idUsuario, idArea);
+            }
+            catch (LogicaExcepciones) { throw; }
+            catch (DatosExcepciones dex) { throw new LogicaExcepciones(dex.Message, dex); }
+            catch (Exception ex)
+            {
+                throw new LogicaExcepciones("Error al asignar el área del usuario", ex);
             }
         }
 

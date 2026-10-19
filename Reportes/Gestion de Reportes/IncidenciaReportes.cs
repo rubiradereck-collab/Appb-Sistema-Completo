@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace Reportes
 {
-    public static class IncidenciaReportes
+    public static partial class IncidenciaReportes
     {
         private static readonly Color ColorNavy = Color.FromRGB(21, 50, 80);
         private static readonly Color ColorAcero = Color.FromRGB(43, 107, 154);
@@ -122,6 +122,10 @@ namespace Reportes
                                     TarjetaKpi("Adopción Sistema", $"{metricas.AdopcionPorcentaje:0.##}%", metricas.AdopcionPorcentaje >= 80 ? Colors.Green.Medium : Colors.Orange.Medium);
                                 if (metricas.TiempoPromedioResolucionHoras.HasValue)
                                     TarjetaKpi("Tiempo prom. resolución", $"{metricas.TiempoPromedioResolucionHoras.Value:0.#} h", ColorAcero);
+                                if (metricas.PorcentajeSlaCumplido.HasValue)
+                                    TarjetaKpi("SLA cumplido", $"{metricas.PorcentajeSlaCumplido.Value:0.#}%", metricas.PorcentajeSlaCumplido.Value >= 80 ? Colors.Green.Medium : Colors.Orange.Medium);
+                                if (metricas.SatisfaccionPromedio.HasValue)
+                                    TarjetaKpi("Satisfacción", $"{metricas.SatisfaccionPromedio.Value:0.0}/5", ColorAcero);
                             });
 
                             
@@ -443,6 +447,15 @@ col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Table(table =>
                     stats.Cell(fRow, 1).Value = "Total Incidencias"; stats.Cell(fRow, 2).Value = metricas.Total; fRow++;
                     stats.Cell(fRow, 1).Value = "Tiempo Prom. Resolución (h)"; stats.Cell(fRow, 2).Value = metricas.TiempoPromedioResolucionHoras.HasValue ? Math.Round(metricas.TiempoPromedioResolucionHoras.Value, 2) : 0; fRow++;
                     stats.Cell(fRow, 1).Value = "Adopción de Sistema (%)"; stats.Cell(fRow, 2).Value = Math.Round(metricas.AdopcionPorcentaje, 2); fRow++;
+                    stats.Cell(fRow, 1).Value = "SLA cumplido (%)";
+                    if (metricas.PorcentajeSlaCumplido.HasValue) stats.Cell(fRow, 2).Value = Math.Round(metricas.PorcentajeSlaCumplido.Value, 2); else stats.Cell(fRow, 2).Value = "-";
+                    stats.Cell(fRow, 3).Value = $"{metricas.TicketsEvaluadosSla} ticket(s) evaluados"; fRow++;
+                    stats.Cell(fRow, 1).Value = "Tiempo Prom. Primera Respuesta (h)";
+                    if (metricas.TiempoPrimeraRespuestaHoras.HasValue) stats.Cell(fRow, 2).Value = Math.Round(metricas.TiempoPrimeraRespuestaHoras.Value, 2); else stats.Cell(fRow, 2).Value = "-";
+                    fRow++;
+                    stats.Cell(fRow, 1).Value = "Satisfacción promedio (1-5)";
+                    if (metricas.SatisfaccionPromedio.HasValue) stats.Cell(fRow, 2).Value = Math.Round(metricas.SatisfaccionPromedio.Value, 2); else stats.Cell(fRow, 2).Value = "-";
+                    stats.Cell(fRow, 3).Value = $"{metricas.TotalCalificaciones} calificación(es)"; fRow++;
                     fRow++;
 
                     if (incidenciasMesAnterior != null && incidenciasMesAnterior.Count > 0)

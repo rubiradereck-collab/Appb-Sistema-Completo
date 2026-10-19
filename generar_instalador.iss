@@ -26,7 +26,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startmenuicon"; Description: "Crear un icono en el menú Inicio"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
-Source: "Presentacion\bin\Release\Presentacion.exe.config"; DestDir: "{app}"; Flags: onlyifdoesntexist
+; El .config se reemplaza siempre: todas las PCs usan la misma configuracion y asi una
+; instalacion vieja (por ejemplo, con la cadena de SQL Server) no queda funcionando a medias.
+Source: "Presentacion\bin\Release\Presentacion.exe.config"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Presentacion\bin\Release\*"; DestDir: "{app}"; Excludes: "*.pdb,*.xml,*.vshost.*,Presentacion.exe.config"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

@@ -35,6 +35,26 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo Verificando la configuracion compilada...
+set CONFIG=Presentacion\bin\Release\Presentacion.exe.config
+findstr /C:"Host=" "%CONFIG%" >nul
+if errorlevel 1 (
+  echo.
+  echo ERROR: %CONFIG% no tiene la cadena de PostgreSQL ^(Host=...^).
+  echo Corrige Presentacion\App.config y vuelve a ejecutar este archivo.
+  pause
+  exit /b 1
+)
+findstr /I /C:"Data Source=" /C:"CLAVE_DE_" /C:"TU_TOKEN" /C:"TU_NUEVO_PASSWORD" "%CONFIG%" >nul
+if not errorlevel 1 (
+  echo.
+  echo ERROR: %CONFIG% todavia tiene la cadena de SQL Server o valores de ejemplo.
+  echo Corrige Presentacion\App.config y vuelve a ejecutar este archivo.
+  pause
+  exit /b 1
+)
+
+echo.
 echo [3/3] Generando instalador con Inno Setup...
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" generar_instalador.iss
 if %errorlevel% neq 0 (
